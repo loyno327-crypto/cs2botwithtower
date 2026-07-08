@@ -52,9 +52,11 @@ def _load_cases() -> list:
 # считается здесь же, на сервере, по тем же цифрам — чтобы игрок не мог
 # подделать монеты, изменив число в браузере.
 #
-# Броня/каска/промахи/хедшоты сюда сознательно не добавлены — это Этап 4.
+# Броня/каска/промахи/хедшоты добавлены на Этапе 4 (см. ниже).
 # Экономика самих башен (стоимость, редкость, апгрейды) — Этапы 5-7,
-# поэтому пока башни бесплатны и одинаковы (пока только один тип бойца).
+# поэтому пока башни бесплатны и одинаковы (пока только один тип бойца,
+# условно вооружённый "AK-47" — реальный выбор оружия появится вместе
+# с редкостями бойцов на Этапе 5).
 BATTLE_CONFIG = {
     "wave_count": 5,
     "point_hp": 100,
@@ -73,6 +75,27 @@ BATTLE_CONFIG = {
     "reward_win_bonus": 50,
     "xp_per_wave": 3,
     "xp_win_bonus": 15,
+
+    # ---- Этап 4: точность, зоны попадания, броня/каска ----
+    # Базовая башня 1 уровня попадает не всегда — апгрейды (Этап 6) будут
+    # поднимать это значение. Из попаданий часть — в голову.
+    "tower_accuracy": 0.7,
+    "tower_headshot_chance": 0.22,
+    # Множитель урона по голове ДО учёта каски (как в CS: голова без
+    # каски — почти всегда смертельна, с каской — уже не факт).
+    "headshot_multiplier": 2.4,
+    # Обычная броня режет урон по телу; каска — дополнительно режет урон
+    # по голове (независимо от брони, как в реальном CS).
+    "armor_damage_reduction": 0.35,
+    "helmet_headshot_reduction": 0.45,
+    # Элитные враги (последняя волна) — усиленная версия обоих параметров
+    # плюс прибавка к скорости движения по пути.
+    "elite_armor_reduction": 0.5,
+    "elite_helmet_reduction": 0.55,
+    "elite_speed_multiplier": 1.25,
+    # Косметика Kill Feed — реальный выбор оружия/скинов появится на Этапах 5-7.
+    "tower_weapon_name": "AK-47",
+    "tower_weapon_icon": "🔫",
 }
 
 
@@ -223,6 +246,14 @@ async def handle_stats(request: web.Request) -> web.Response:
         "td_battles_played": user["td_battles_played"] or 0,
         "td_wins": user["td_wins"] or 0,
         "td_best_wave": user["td_best_wave"] or 0,
+        "td_shots_fired": user["td_shots_fired"] or 0,
+        "td_hits": user["td_hits"] or 0,
+        "td_headshots": user["td_headshots"] or 0,
+        "td_damage_dealt": user["td_damage_dealt"] or 0,
+        "td_accuracy_pct": (
+            round((user["td_hits"] or 0) / user["td_shots_fired"] * 100)
+            if user["td_shots_fired"] else 0
+        ),
     })
 
 
@@ -302,6 +333,21 @@ async def handle_battle_finish(request: web.Request) -> web.Response:
     # Клампим на случай, если с фронтенда прилетит бессмысленное число.
     wave_reached = max(0, min(wave_reached, BATTLE_CONFIG["wave_count"]))
 
+    # Статистика стрельбы (Этап 4) — на награду не влияет, только на
+    # профиль/точность, но всё равно клампим на разумные значения, чтобы
+    # в БД не улетело что-то абсурдное из испорченного запроса.
+    def _clamp_int(value, lo, hi):
+        try:
+            n = int(value)
+        except (TypeError, ValueError):
+            return lo
+        return max(lo, min(n, hi))
+
+    shots_fired = _clamp_int(payload.get("shots_fired", 0), 0, 100_000)
+    hits = _clamp_int(payload.get("hits", 0), 0, shots_fired)
+    headshots = _clamp_int(payload.get("headshots", 0), 0, hits)
+    damage_dealt = _clamp_int(payload.get("damage_dealt", 0), 0, 10_000_000)
+
     reward_coins = wave_reached * BATTLE_CONFIG["reward_per_wave"]
     reward_xp = wave_reached * BATTLE_CONFIG["xp_per_wave"]
     if won:
@@ -309,7 +355,12 @@ async def handle_battle_finish(request: web.Request) -> web.Response:
         reward_xp += BATTLE_CONFIG["xp_win_bonus"]
 
     db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
-    result = db.record_td_battle_result(user_id, wave_reached, won, reward_coins, reward_xp)
+    result = db.record_td_battle_result(
+        user_id, wave_reached, won, reward_coins, reward_xp,
+        shots_fired=shots_fired, hits=hits, headshots=headshots, damage_dealt=damage_dealt,
+    )
+
+    accuracy_pct = round(hits / shots_fired * 100) if shots_fired else 0
 
     return web.json_response({
         "reward_coins": reward_coins,
@@ -317,6 +368,8 @@ async def handle_battle_finish(request: web.Request) -> web.Response:
         "best_wave": result["best_wave"],
         "balance": db.get_balance(user_id),
         "level_info": result["xp_result"],
+        "accuracy_pct": accuracy_pct,
+        "headshots": headshots,
     })
 
 

@@ -140,6 +140,13 @@ def init_db():
         ("td_battles_played", "INTEGER DEFAULT 0"),
         ("td_wins", "INTEGER DEFAULT 0"),
         ("td_best_wave", "INTEGER DEFAULT 0"),
+        # Этап 4 — боевая механика (точность/хедшоты/броня): накопительная
+        # статистика стрельбы за всё время, нужна для расчёта общей точности
+        # в профиле и для будущих ачивок ("100 хедшотов" и т.п.).
+        ("td_shots_fired", "INTEGER DEFAULT 0"),
+        ("td_hits", "INTEGER DEFAULT 0"),
+        ("td_headshots", "INTEGER DEFAULT 0"),
+        ("td_damage_dealt", "INTEGER DEFAULT 0"),
     ]
     for col_name, col_type in new_columns:
         try:
@@ -502,6 +509,7 @@ STAT_COLUMNS = {
     "work_correct", "work_wrong", "cases_opened",
     "duels_played", "duels_won", "upgrades_success", "upgrades_failed",
     "jackpot_wins", "td_battles_played", "td_wins",
+    "td_shots_fired", "td_hits", "td_headshots", "td_damage_dealt",
 }
 
 
@@ -562,16 +570,29 @@ def get_best_wave(user_id: int) -> int:
     return row["td_best_wave"] if row and row["td_best_wave"] is not None else 0
 
 
-def record_td_battle_result(user_id: int, wave_reached: int, won: bool, reward_coins: int, reward_xp: int):
+def record_td_battle_result(
+    user_id: int, wave_reached: int, won: bool, reward_coins: int, reward_xp: int,
+    shots_fired: int = 0, hits: int = 0, headshots: int = 0, damage_dealt: int = 0,
+):
     """Фиксирует итог одного боя Tower Defence:
     - увеличивает счётчик сыгранных боёв (и побед, если бой выигран);
     - обновляет рекорд по волнам, только если новый результат выше;
     - начисляет монеты (через add_balance — total_earned обновится сам)
-      и опыт (через add_xp — обработает и повышение уровня).
+      и опыт (через add_xp — обработает и повышение уровня);
+    - копит статистику стрельбы за всё время (Этап 4: точность/хедшоты/
+      урон) — используется для процента точности в профиле.
     Возвращает актуальный рекорд волны и результат начисления опыта."""
     increment_stat(user_id, "td_battles_played")
     if won:
         increment_stat(user_id, "td_wins")
+    if shots_fired:
+        increment_stat(user_id, "td_shots_fired", shots_fired)
+    if hits:
+        increment_stat(user_id, "td_hits", hits)
+    if headshots:
+        increment_stat(user_id, "td_headshots", headshots)
+    if damage_dealt:
+        increment_stat(user_id, "td_damage_dealt", damage_dealt)
 
     conn = get_connection()
     cur = conn.cursor()

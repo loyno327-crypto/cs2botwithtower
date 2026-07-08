@@ -251,14 +251,35 @@
   #play-select.hidden, #play-battle.hidden, #play-result.hidden{display:none;}
 
   .battle-hud{
-    display:flex; gap:8px; margin-bottom:8px;
+    display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;
   }
   .hud-stat{
-    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    flex:1; min-width:72px; background:var(--panel); border:1px solid var(--line); border-radius:4px;
     padding:8px 10px;
   }
   .hud-stat .lbl{font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase;}
   .hud-stat .val{font-family:var(--mono); font-size:16px; font-weight:600; color:var(--amber); margin-top:2px;}
+
+  /* ---- Kill Feed (Этап 4) ---- */
+  #kill-feed{
+    position:absolute; top:6px; right:6px; z-index:5;
+    display:flex; flex-direction:column; align-items:flex-end; gap:3px;
+    pointer-events:none; max-width:78%;
+  }
+  .kf-row{
+    display:flex; align-items:center; gap:5px;
+    background:rgba(11,13,10,0.72); border:1px solid var(--line); border-radius:3px;
+    padding:3px 7px; font-family:var(--mono); font-size:10.5px; color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    animation:kf-in .18s ease;
+  }
+  .kf-shooter{color:var(--amber-dim);}
+  .kf-weapon{filter:grayscale(0.1);}
+  .kf-headshot{color:var(--red); font-weight:700; letter-spacing:.5px;}
+  .kf-target{color:var(--text); font-weight:600;}
+  .kf-row.kf-fade{animation:kf-out .5s ease forwards;}
+  @keyframes kf-in{from{opacity:0; transform:translateX(8px);} to{opacity:1; transform:translateX(0);}}
+  @keyframes kf-out{from{opacity:1;} to{opacity:0; transform:translateX(8px);}}
 
   .point-hp-wrap{
     background:var(--panel); border:1px solid var(--line); border-radius:4px;
@@ -310,7 +331,7 @@
 <header class="hud">
   <div class="hud-top">
     <div class="brand"><span class="status-dot"></span><b>OPS</b> DEFENCE // WEB APP</div>
-    <div class="brand" id="stage-tag">STAGE 2</div>
+    <div class="brand" id="stage-tag">STAGE 4</div>
   </div>
 
   <div class="profile-card" id="profile-card">
@@ -329,12 +350,14 @@
 
     <div class="section-title spaced">Что дальше</div>
     <div class="roadmap-panel">
-      <span class="tag">Этап 2 из 10</span><br>
-      Сейчас собран каркас интерфейса: реальные данные из бота (баланс,
-      инвентарь, статистика) уже видны прямо здесь, в Web App.<br><br>
-      На <b>Этапе 3</b> появится первый играбельный бой: одна карта, точка,
-      волны врагов — без промахов и хедшотов, только базовый цикл
-      "разместил бойца → отбил волну".
+      <span class="tag">Этап 4 из 10</span><br>
+      Бой теперь считается по-честному: у каждого выстрела есть шанс
+      промаха, зона попадания (тело/голова), а у врагов — броня и каска,
+      которые режут урон. Наверху экрана боя во время матча — Kill Feed,
+      как в CS.<br><br>
+      На <b>Этапе 5</b> появятся сами бойцы с редкостью (обычная → редкая →
+      эпическая → легендарная → мифическая) — они будут выпадать из тех
+      же кейсов, что уже открываются в боте.
     </div>
   </div>
 
@@ -359,9 +382,12 @@
       <button class="btn-primary" id="play-btn">Выбери сторону</button>
 
       <div class="play-note">
-        <b>Этап 3:</b> первый играбельный бой. Ставь бойцов на точки у
-        дороги — они бьют без промахов и хедшотов (это Этап 4), волны
-        становятся сложнее. Продержись все волны — победа.
+        <b>Этап 4:</b> башни теперь не бьют без промаха — есть шанс
+        попадания, зона попадания (тело/голова) и Kill Feed сверху экрана,
+        как в матче CS. С волны 2 у врагов появляется броня, с волны 4 —
+        ещё и каска, последняя волна — элита с усиленной защитой и
+        скоростью. Хедшот без каски почти всегда смертелен, с кевларом —
+        уже не факт.
       </div>
     </div>
 
@@ -369,6 +395,7 @@
       <div class="battle-hud">
         <div class="hud-stat"><div class="lbl">Волна</div><div class="val" id="hud-wave">1/5</div></div>
         <div class="hud-stat"><div class="lbl">Убийств</div><div class="val" id="hud-kills">0</div></div>
+        <div class="hud-stat"><div class="lbl">Точность</div><div class="val" id="hud-accuracy">0%</div></div>
         <div class="hud-stat"><div class="lbl">Бойцов</div><div class="val" id="hud-towers">0/4</div></div>
       </div>
 
@@ -379,9 +406,10 @@
 
       <div class="battle-canvas-wrap">
         <canvas id="battle-canvas" width="800" height="450"></canvas>
+        <div id="kill-feed"></div>
       </div>
 
-      <div class="build-hint">Тапни по <b>пустой точке</b> у дороги, чтобы поставить бойца (бесплатно на этом этапе).</div>
+      <div class="build-hint">Тапни по <b>пустой точке</b> у дороги, чтобы поставить бойца (бесплатно на этом этапе). 🛡 — броня, ⛑ — каска, ★ — элитный противник.</div>
 
       <button class="quit-btn" id="quit-btn">Сдаться</button>
     </div>
@@ -557,6 +585,48 @@
     { x: 650, y: 150 },
   ];
 
+  // Позывные противников — только для Kill Feed, чисто оформительские,
+  // не завязаны ни на какие реальные команды/персонажей.
+  const ENEMY_NAMES = [
+    'Ghost', 'Viper', 'Reaper', 'Havoc', 'Raptor', 'Falcon', 'Cobra',
+    'Widow', 'Jackal', 'Ronin', 'Specter', 'Rook', 'Talon', 'Warden',
+    'Ash', 'Blitz', 'Nomad', 'Saber', 'Vex', 'Krait',
+  ];
+
+  // Броня/каска/скорость противника по номеру волны (Этап 4). Ранние
+  // волны — без защиты, средние — броня, поздние — броня+каска, последняя
+  // волна — элита с усиленной защитой и повышенной скоростью. Считается
+  // от battleConfig.wave_count, поэтому переживёт правку числа волн.
+  function enemyTierForWave(wave) {
+    const total = battleConfig.wave_count;
+    if (wave >= total) {
+      return {
+        key: 'elite', armor: true, helmet: true,
+        armorReduction: battleConfig.elite_armor_reduction,
+        helmetReduction: battleConfig.elite_helmet_reduction,
+        speedMul: battleConfig.elite_speed_multiplier,
+      };
+    }
+    const ratio = wave / total;
+    if (ratio > 0.6) {
+      return {
+        key: 'heavy', armor: true, helmet: true,
+        armorReduction: battleConfig.armor_damage_reduction,
+        helmetReduction: battleConfig.helmet_headshot_reduction,
+        speedMul: 1,
+      };
+    }
+    if (ratio > 0.3) {
+      return {
+        key: 'light', armor: true, helmet: false,
+        armorReduction: battleConfig.armor_damage_reduction,
+        helmetReduction: 0,
+        speedMul: 1,
+      };
+    }
+    return { key: 'none', armor: false, helmet: false, armorReduction: 0, helmetReduction: 0, speedMul: 1 };
+  }
+
   function pathTotalLength() {
     let total = 0;
     for (let i = 0; i < PATH.length - 1; i++) {
@@ -644,7 +714,16 @@
       spawnTimer: 0,
       waveClearedAt: null,
       lastFrameTime: null,
+      // Этап 4: статистика стрельбы за бой — уходит на сервер по итогу.
+      shotsFired: 0,
+      hits: 0,
+      misses: 0,
+      headshots: 0,
+      damageDealt: 0,
     };
+
+    const feedEl = document.getElementById('kill-feed');
+    if (feedEl) feedEl.innerHTML = '';
 
     spawnWave();
     updateHud();
@@ -698,8 +777,32 @@
     document.getElementById('hud-wave').textContent = `${game.wave}/${battleConfig.wave_count}`;
     document.getElementById('hud-kills').textContent = String(game.kills);
     document.getElementById('hud-towers').textContent = `${game.towers.length}/${battleConfig.max_towers}`;
+    const acc = game.shotsFired > 0 ? Math.round((game.hits / game.shotsFired) * 100) : 0;
+    document.getElementById('hud-accuracy').textContent = acc + '%';
     const pct = Math.max(0, Math.round((game.pointHp / game.pointMaxHp) * 100));
     document.getElementById('point-hp-fill').style.width = pct + '%';
+  }
+
+  // Kill Feed (Этап 4): показывает только смертельный выстрел, с иконкой
+  // оружия и, если это был хедшот, отдельной пометкой — как в CS.
+  function pushKillFeed(enemy, isHeadshot) {
+    const feed = document.getElementById('kill-feed');
+    if (!feed) return;
+    const row = document.createElement('div');
+    row.className = 'kf-row';
+    const weaponName = battleConfig.tower_weapon_name || 'Боец';
+    const weaponIcon = battleConfig.tower_weapon_icon || '🔫';
+    row.innerHTML =
+      `<span class="kf-shooter">${escapeHtml(weaponName)}</span>` +
+      `<span class="kf-weapon">${weaponIcon}</span>` +
+      (isHeadshot ? `<span class="kf-headshot">HEADSHOT</span>` : '') +
+      `<span class="kf-target">${escapeHtml(enemy.name)}</span>`;
+    feed.appendChild(row);
+    while (feed.children.length > 5) feed.removeChild(feed.firstChild);
+    setTimeout(() => {
+      row.classList.add('kf-fade');
+      setTimeout(() => row.remove(), 500);
+    }, 2600);
   }
 
   function gameLoop(ts) {
@@ -719,12 +822,20 @@
     if (game.spawnQueue > 0) {
       game.spawnTimer -= dt;
       if (game.spawnTimer <= 0) {
+        const tier = enemyTierForWave(game.wave);
+        const hp = currentWaveEnemyHp();
         game.enemies.push({
           t: 0,
-          hp: currentWaveEnemyHp(),
-          maxHp: currentWaveEnemyHp(),
-          speed: currentWaveEnemySpeed(),
+          hp,
+          maxHp: hp,
+          speed: currentWaveEnemySpeed() * tier.speedMul,
           alive: true,
+          tierKey: tier.key,
+          armor: tier.armor,
+          helmet: tier.helmet,
+          armorReduction: tier.armorReduction,
+          helmetReduction: tier.helmetReduction,
+          name: ENEMY_NAMES[Math.floor(Math.random() * ENEMY_NAMES.length)],
         });
         game.spawnQueue--;
         game.spawnTimer = 0.9;
@@ -747,7 +858,8 @@
       }
     }
 
-    // Стрельба башен: без промахов и хедшотов (это Этап 4) — фиксированный урон.
+    // Стрельба башен (Этап 4): каждый выстрел считается отдельно —
+    // шанс промаха, зона попадания (тело/голова), броня и каска гасят урон.
     for (const tower of game.towers) {
       tower.cooldown -= dt;
       if (tower.cooldown > 0) continue;
@@ -765,12 +877,34 @@
       }
 
       if (target) {
-        target.hp -= battleConfig.tower_damage;
         tower.cooldown = battleConfig.tower_fire_interval;
         tower.flashUntil = performance.now() + 90;
-        if (target.hp <= 0) {
-          target.alive = false;
-          game.kills++;
+        game.shotsFired++;
+
+        const isHit = Math.random() < battleConfig.tower_accuracy;
+        if (!isHit) {
+          game.misses++;
+        } else {
+          game.hits++;
+          const isHeadshot = Math.random() < battleConfig.tower_headshot_chance;
+          let dmg;
+          if (isHeadshot) {
+            game.headshots++;
+            dmg = battleConfig.tower_damage * battleConfig.headshot_multiplier;
+            if (target.helmet) dmg *= (1 - target.helmetReduction);
+          } else {
+            dmg = battleConfig.tower_damage;
+            if (target.armor) dmg *= (1 - target.armorReduction);
+          }
+          dmg = Math.max(1, Math.round(dmg));
+          target.hp -= dmg;
+          game.damageDealt += dmg;
+
+          if (target.hp <= 0) {
+            target.alive = false;
+            game.kills++;
+            pushKillFeed(target, isHeadshot);
+          }
         }
       }
     }
@@ -850,7 +984,7 @@
       ctx.fillText('🔫', tower.x, tower.y + 1);
     }
 
-    // Враги + полоска HP.
+    // Враги + полоска HP + индикаторы брони/каски/элиты (Этап 4).
     const enemyColor = game.side === 't' ? '#4a90d9' : '#c1462f';
     for (const e of game.enemies) {
       const p = pointAtT(e.t);
@@ -858,6 +992,18 @@
       ctx.fillStyle = enemyColor;
       ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
       ctx.fill();
+
+      if (e.armor) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = e.helmet ? '#f5c451' : '#9b9b9b';
+        ctx.stroke();
+      }
+      if (e.tierKey === 'elite') {
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#f5c451';
+        ctx.fillText('★', p.x, p.y - 24);
+      }
 
       const barW = 22;
       ctx.fillStyle = '#2a3122';
@@ -883,7 +1029,11 @@
           'Content-Type': 'application/json',
           'X-Telegram-Init-Data': initData,
         },
-        body: JSON.stringify({ side: game.side, wave_reached: finalWave, won }),
+        body: JSON.stringify({
+          side: game.side, wave_reached: finalWave, won,
+          shots_fired: game.shotsFired, hits: game.hits,
+          headshots: game.headshots, damage_dealt: Math.round(game.damageDealt),
+        }),
       });
       if (res.ok) rewardInfo = await res.json();
     } catch (e) {
@@ -906,12 +1056,17 @@
     const coins = rewardInfo ? rewardInfo.reward_coins : 0;
     const xp = rewardInfo ? rewardInfo.reward_xp : 0;
     const bestWave = rewardInfo ? rewardInfo.best_wave : finalWave;
+    const accuracy = rewardInfo && typeof rewardInfo.accuracy_pct === 'number'
+      ? rewardInfo.accuracy_pct
+      : (game.shotsFired ? Math.round((game.hits / game.shotsFired) * 100) : 0);
 
     document.getElementById('result-stats').innerHTML = `
       <div class="stat-card"><div class="val">${game.kills}</div><div class="lbl">Убийств</div></div>
       <div class="stat-card"><div class="val">+${fmt(coins)}</div><div class="lbl">Монет</div></div>
       <div class="stat-card"><div class="val">+${fmt(xp)}</div><div class="lbl">Опыта</div></div>
       <div class="stat-card"><div class="val">${fmt(bestWave)}</div><div class="lbl">Рекорд волн</div></div>
+      <div class="stat-card"><div class="val">${accuracy}%</div><div class="lbl">Точность</div></div>
+      <div class="stat-card"><div class="val">${game.headshots}</div><div class="lbl">Хедшотов</div></div>
     `;
 
     resultEl.classList.remove('hidden');
@@ -993,6 +1148,11 @@
         ['Апгрейдов неудачно', fmt(s.upgrades_failed)],
         ['Побед в джекпоте', fmt(s.jackpot_wins)],
         ['Предметов в инвентаре', fmt(s.items_count)],
+        ['TD: боёв сыграно', fmt(s.td_battles_played)],
+        ['TD: побед', fmt(s.td_wins)],
+        ['TD: рекорд волн', fmt(s.td_best_wave)],
+        ['TD: точность', `${fmt(s.td_accuracy_pct)}%`],
+        ['TD: хедшотов', fmt(s.td_headshots)],
       ];
       let html = `<div class="profile-stat-list">` +
         rows.map(([k, v]) => `<div class="profile-stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') +
