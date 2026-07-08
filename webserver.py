@@ -96,10 +96,18 @@ async def handle_me(request: web.Request) -> web.Response:
     })
 
 
+async def handle_index(request: web.Request) -> web.Response:
+    # aiohttp's add_static НЕ отдаёт index.html автоматически на "/" —
+    # он трактует "/" как запрос к самой папке и при show_index=False
+    # отвечает 403 Forbidden. Поэтому явный маршрут для корня обязателен.
+    return web.FileResponse(os.path.join(WEBAPP_DIR, "index.html"))
+
+
 def create_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/api/me", handle_me)
-    # Всё остальное — статика самой игры (index.html, css, js, картинки).
+    app.router.add_get("/", handle_index)
+    # Всё остальное (css, js, картинки) — статика самой игры.
     app.router.add_static("/", WEBAPP_DIR, show_index=False)
     return app
 
