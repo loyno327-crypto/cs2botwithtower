@@ -135,6 +135,11 @@ def init_db():
         ("jackpot_wins", "INTEGER DEFAULT 0"),
         ("xp", "INTEGER DEFAULT 0"),
         ("level", "INTEGER DEFAULT 1"),
+        # Статистика Tower Defence Web App (Этап 3) — отдельные колонки
+        # с префиксом td_, чтобы не путать с текстовыми режимами бота.
+        ("td_battles_played", "INTEGER DEFAULT 0"),
+        ("td_wins", "INTEGER DEFAULT 0"),
+        ("td_best_wave", "INTEGER DEFAULT 0"),
     ]
     for col_name, col_type in new_columns:
         try:
@@ -496,7 +501,7 @@ def delete_duel(duel_id: int):
 STAT_COLUMNS = {
     "work_correct", "work_wrong", "cases_opened",
     "duels_played", "duels_won", "upgrades_success", "upgrades_failed",
-    "jackpot_wins",
+    "jackpot_wins", "td_battles_played", "td_wins",
 }
 
 
@@ -543,6 +548,49 @@ def get_user_full_stats(user_id: int):
         "items_total_value": inv["total"],
         "best_item_name": best_item_name,
         "best_item_price": inv["best_price"],
+    }
+
+
+# ---------- Tower Defence Web App (Этап 3) ----------
+
+def get_best_wave(user_id: int) -> int:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT td_best_wave FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    conn.close()
+    return row["td_best_wave"] if row and row["td_best_wave"] is not None else 0
+
+
+def record_td_battle_result(user_id: int, wave_reached: int, won: bool, reward_coins: int, reward_xp: int):
+    """Фиксирует итог одного боя Tower Defence:
+    - увеличивает счётчик сыгранных боёв (и побед, если бой выигран);
+    - обновляет рекорд по волнам, только если новый результат выше;
+    - начисляет монеты (через add_balance — total_earned обновится сам)
+      и опыт (через add_xp — обработает и повышение уровня).
+    Возвращает актуальный рекорд волны и результат начисления опыта."""
+    increment_stat(user_id, "td_battles_played")
+    if won:
+        increment_stat(user_id, "td_wins")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT td_best_wave FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    current_best = row["td_best_wave"] if row and row["td_best_wave"] is not None else 0
+    new_best = max(current_best, wave_reached)
+    if new_best != current_best:
+        cur.execute("UPDATE users SET td_best_wave = ? WHERE user_id = ?", (new_best, user_id))
+        conn.commit()
+    conn.close()
+
+    if reward_coins:
+        add_balance(user_id, reward_coins)
+    xp_result = add_xp(user_id, reward_xp) if reward_xp else None
+
+    return {
+        "best_wave": new_best,
+        "xp_result": xp_result,
     }
 
 

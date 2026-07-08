@@ -246,6 +246,63 @@
   .tab .icon{font-size:18px; line-height:1;}
   .tab.active{color:var(--amber);}
   .tab.active .icon{filter:drop-shadow(0 0 4px rgba(224,167,46,.5));}
+
+  /* ---- Играть: экран боя ---- */
+  #play-select.hidden, #play-battle.hidden, #play-result.hidden{display:none;}
+
+  .battle-hud{
+    display:flex; gap:8px; margin-bottom:8px;
+  }
+  .hud-stat{
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:8px 10px;
+  }
+  .hud-stat .lbl{font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase;}
+  .hud-stat .val{font-family:var(--mono); font-size:16px; font-weight:600; color:var(--amber); margin-top:2px;}
+
+  .point-hp-wrap{
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:8px 10px; margin-bottom:8px;
+  }
+  .point-hp-wrap .lbl{font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; margin-bottom:5px;}
+  .hp-track{height:8px; background:var(--line); border-radius:4px; overflow:hidden;}
+  .hp-fill{height:100%; background:linear-gradient(90deg, var(--red), var(--amber)); width:100%; transition:width .25s ease;}
+
+  .battle-canvas-wrap{
+    background:#0e1c10; border:1px solid var(--line); border-radius:6px; overflow:hidden;
+    position:relative; line-height:0;
+  }
+  #battle-canvas{width:100%; height:auto; display:block; touch-action:manipulation;}
+
+  .build-hint{
+    font-family:var(--mono); font-size:10.5px; color:var(--text-dim); text-align:center;
+    margin-top:8px; line-height:1.5;
+  }
+  .build-hint b{color:var(--amber);}
+
+  .quit-btn{
+    margin-top:12px; width:100%; padding:11px; border-radius:4px; cursor:pointer;
+    background:none; border:1px solid var(--line); color:var(--text-dim);
+    font-family:var(--sans); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.5px;
+  }
+
+  .result-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:24px 18px; text-align:center; margin-top:6px;
+  }
+  .result-title{font-size:24px; font-weight:700; margin-bottom:4px;}
+  .result-title.win{color:var(--green);}
+  .result-title.lose{color:var(--red);}
+  .result-sub{font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:16px;}
+  .result-stats{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; text-align:left;
+  }
+  .result-stats .stat-card{border-top-color:var(--amber);}
+  .result-btn{
+    width:100%; padding:13px; border:none; border-radius:4px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:14px; letter-spacing:.5px; text-transform:uppercase;
+  }
 </style>
 </head>
 <body>
@@ -284,25 +341,58 @@
   <!-- ИГРАТЬ -->
   <div class="view" id="view-play">
     <div class="section-title">Играть</div>
-    <div class="side-grid">
-      <div class="side-card t" data-side="t">
-        <span class="icon">🔴</span>
-        <div class="name">Террористы</div>
-        <div class="desc">Бомба уже установлена. Удержи точку и отбей все волны.</div>
+
+    <div id="play-select">
+      <div class="side-grid">
+        <div class="side-card t" data-side="t">
+          <span class="icon">🔴</span>
+          <div class="name">Террористы</div>
+          <div class="desc">Бомба уже установлена. Удержи точку и отбей все волны.</div>
+        </div>
+        <div class="side-card ct" data-side="ct">
+          <span class="icon">🔵</span>
+          <div class="name">Контр-террористы</div>
+          <div class="desc">Не дай врагу дойти до точки и поставить бомбу.</div>
+        </div>
       </div>
-      <div class="side-card ct" data-side="ct">
-        <span class="icon">🔵</span>
-        <div class="name">Контр-террористы</div>
-        <div class="desc">Не дай врагу дойти до точки и поставить бомбу.</div>
+
+      <button class="btn-primary" id="play-btn">Выбери сторону</button>
+
+      <div class="play-note">
+        <b>Этап 3:</b> первый играбельный бой. Ставь бойцов на точки у
+        дороги — они бьют без промахов и хедшотов (это Этап 4), волны
+        становятся сложнее. Продержись все волны — победа.
       </div>
     </div>
 
-    <button class="btn-primary" id="play-btn">Выбери сторону</button>
+    <div id="play-battle" class="hidden">
+      <div class="battle-hud">
+        <div class="hud-stat"><div class="lbl">Волна</div><div class="val" id="hud-wave">1/5</div></div>
+        <div class="hud-stat"><div class="lbl">Убийств</div><div class="val" id="hud-kills">0</div></div>
+        <div class="hud-stat"><div class="lbl">Бойцов</div><div class="val" id="hud-towers">0/4</div></div>
+      </div>
 
-    <div class="play-note">
-      <b>Этап 2:</b> здесь пока только выбор стороны — сам бой (башни-бойцы,
-      волны врагов, стрельба) появится на Этапе 3. Твой выбор запомнится
-      и будет использован, когда бой станет доступен.
+      <div class="point-hp-wrap">
+        <div class="lbl">Здоровье точки</div>
+        <div class="hp-track"><div class="hp-fill" id="point-hp-fill"></div></div>
+      </div>
+
+      <div class="battle-canvas-wrap">
+        <canvas id="battle-canvas" width="800" height="450"></canvas>
+      </div>
+
+      <div class="build-hint">Тапни по <b>пустой точке</b> у дороги, чтобы поставить бойца (бесплатно на этом этапе).</div>
+
+      <button class="quit-btn" id="quit-btn">Сдаться</button>
+    </div>
+
+    <div id="play-result" class="hidden">
+      <div class="result-card">
+        <div class="result-title" id="result-title">Победа</div>
+        <div class="result-sub" id="result-sub">Волна 5 из 5</div>
+        <div class="result-stats" id="result-stats"></div>
+        <button class="result-btn" id="result-again-btn">Играть снова</button>
+      </div>
     </div>
   </div>
 
@@ -432,33 +522,403 @@
     }
   }
 
-  // ---------- Играть (пока — только выбор стороны) ----------
+  // ==================== ИГРАТЬ: боевой движок (Этап 3) ====================
+  //
+  // Полностью локальная симуляция на Canvas (без внешних библиотек — по
+  // архитектуре проекта: vanilla JS, легче для мобильного Telegram WebView).
+  // Сервер участвует только в начале (отдаёт баланс боя /api/battle/config)
+  // и в конце (принимает итог /api/battle/finish и считает награду сам).
+
+  const selectEl = document.getElementById('play-select');
+  const battleEl = document.getElementById('play-battle');
+  const resultEl = document.getElementById('play-result');
+  const canvas = document.getElementById('battle-canvas');
+  const ctx = canvas.getContext('2d');
+
+  let selectedSide = null; // 't' | 'ct'
+  let battleConfig = null;
+
+  // Путь врага — ломаная линия в логических координатах канваса (800x450).
+  // Для стороны T (мы обороняем уже заложенную бомбу) точка — 💣.
+  // Для стороны CT (мешаем заложить бомбу) точка — 🎯.
+  const PATH = [
+    { x: -20, y: 90 },
+    { x: 210, y: 90 },
+    { x: 210, y: 310 },
+    { x: 530, y: 310 },
+    { x: 530, y: 150 },
+    { x: 760, y: 150 },
+  ];
+
+  const BUILD_SPOTS = [
+    { x: 210, y: 190 },
+    { x: 370, y: 310 },
+    { x: 530, y: 230 },
+    { x: 650, y: 150 },
+  ];
+
+  function pathTotalLength() {
+    let total = 0;
+    for (let i = 0; i < PATH.length - 1; i++) {
+      total += Math.hypot(PATH[i + 1].x - PATH[i].x, PATH[i + 1].y - PATH[i].y);
+    }
+    return total;
+  }
+  const PATH_LENGTH = pathTotalLength();
+
+  // Переводит долю пройденного пути t (0..1) в координаты x,y.
+  function pointAtT(t) {
+    let dist = t * PATH_LENGTH;
+    for (let i = 0; i < PATH.length - 1; i++) {
+      const segLen = Math.hypot(PATH[i + 1].x - PATH[i].x, PATH[i + 1].y - PATH[i].y);
+      if (dist <= segLen || i === PATH.length - 2) {
+        const ratio = segLen === 0 ? 0 : Math.min(1, dist / segLen);
+        return {
+          x: PATH[i].x + (PATH[i + 1].x - PATH[i].x) * ratio,
+          y: PATH[i].y + (PATH[i + 1].y - PATH[i].y) * ratio,
+        };
+      }
+      dist -= segLen;
+    }
+    return PATH[PATH.length - 1];
+  }
+
+  async function loadBattleConfig() {
+    if (!battleConfig) battleConfig = await apiGet('/api/battle/config');
+    return battleConfig;
+  }
+
   function initPlayTab() {
     const cards = document.querySelectorAll('.side-card');
     const btn = document.getElementById('play-btn');
-    let selected = localStorage.getItem?.('ops_side') || null; // на случай если localStorage недоступен — просто null
-
-    function apply() {
-      cards.forEach(c => c.classList.toggle('selected', c.dataset.side === selected));
-      if (selected) {
-        btn.textContent = selected === 't' ? 'Сторона: Террористы ✓' : 'Сторона: Контр-террористы ✓';
-        btn.classList.add('ready');
-      } else {
-        btn.textContent = 'Выбери сторону';
-        btn.classList.remove('ready');
-      }
-    }
 
     cards.forEach(card => {
       card.addEventListener('click', () => {
-        selected = card.dataset.side;
-        try { localStorage.setItem('ops_side', selected); } catch (e) {}
+        selectedSide = card.dataset.side;
+        cards.forEach(c => c.classList.toggle('selected', c === card));
         if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        apply();
+        btn.textContent = selectedSide === 't' ? 'Начать бой: Террористы' : 'Начать бой: Контр-террористы';
+        btn.classList.add('ready');
       });
     });
 
-    apply();
+    btn.addEventListener('click', async () => {
+      if (!selectedSide) return;
+      try {
+        await loadBattleConfig();
+      } catch (e) {
+        alert('Не удалось загрузить настройки боя. Попробуй ещё раз.');
+        return;
+      }
+      startBattle();
+    });
+
+    document.getElementById('quit-btn').addEventListener('click', () => {
+      if (game && game.running) finishBattle(false);
+    });
+
+    document.getElementById('result-again-btn').addEventListener('click', () => {
+      resultEl.classList.add('hidden');
+      selectEl.classList.remove('hidden');
+    });
+  }
+
+  let game = null; // состояние текущего боя
+
+  function startBattle() {
+    const cfg = battleConfig;
+    selectEl.classList.add('hidden');
+    resultEl.classList.add('hidden');
+    battleEl.classList.remove('hidden');
+
+    game = {
+      running: true,
+      side: selectedSide,
+      wave: 1,
+      pointHp: cfg.point_hp,
+      pointMaxHp: cfg.point_hp,
+      kills: 0,
+      towers: [],
+      enemies: [],
+      spawnQueue: 0,
+      spawnTimer: 0,
+      waveClearedAt: null,
+      lastFrameTime: null,
+    };
+
+    spawnWave();
+    updateHud();
+    requestAnimationFrame(gameLoop);
+  }
+
+  function currentWaveEnemyCount() {
+    return battleConfig.base_enemy_count + (game.wave - 1) * battleConfig.enemy_count_step;
+  }
+  function currentWaveEnemyHp() {
+    return battleConfig.base_enemy_hp + (game.wave - 1) * battleConfig.enemy_hp_step;
+  }
+  function currentWaveEnemySpeed() {
+    return battleConfig.base_enemy_speed + (game.wave - 1) * battleConfig.enemy_speed_step;
+  }
+
+  function spawnWave() {
+    game.spawnQueue = currentWaveEnemyCount();
+    game.spawnTimer = 0;
+  }
+
+  function handleCanvasClick(evt) {
+    if (!game || !game.running) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (evt.clientX - rect.left) * scaleX;
+    const y = (evt.clientY - rect.top) * scaleY;
+
+    if (game.towers.length >= battleConfig.max_towers) return;
+
+    for (const spot of BUILD_SPOTS) {
+      const occupied = game.towers.some(t => t.spotX === spot.x && t.spotY === spot.y);
+      if (occupied) continue;
+      if (Math.hypot(spot.x - x, spot.y - y) < 26) {
+        game.towers.push({
+          spotX: spot.x, spotY: spot.y,
+          x: spot.x, y: spot.y,
+          cooldown: 0,
+          flashUntil: 0,
+        });
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+        updateHud();
+        return;
+      }
+    }
+  }
+  canvas.addEventListener('click', handleCanvasClick);
+
+  function updateHud() {
+    document.getElementById('hud-wave').textContent = `${game.wave}/${battleConfig.wave_count}`;
+    document.getElementById('hud-kills').textContent = String(game.kills);
+    document.getElementById('hud-towers').textContent = `${game.towers.length}/${battleConfig.max_towers}`;
+    const pct = Math.max(0, Math.round((game.pointHp / game.pointMaxHp) * 100));
+    document.getElementById('point-hp-fill').style.width = pct + '%';
+  }
+
+  function gameLoop(ts) {
+    if (!game || !game.running) return;
+    if (game.lastFrameTime === null) game.lastFrameTime = ts;
+    const dt = Math.min(0.05, (ts - game.lastFrameTime) / 1000); // капаем dt, чтобы не телепортировало при лаге вкладки
+    game.lastFrameTime = ts;
+
+    stepGame(dt);
+    renderGame();
+
+    if (game.running) requestAnimationFrame(gameLoop);
+  }
+
+  function stepGame(dt) {
+    // Спавн врагов текущей волны, по одному, с небольшим интервалом.
+    if (game.spawnQueue > 0) {
+      game.spawnTimer -= dt;
+      if (game.spawnTimer <= 0) {
+        game.enemies.push({
+          t: 0,
+          hp: currentWaveEnemyHp(),
+          maxHp: currentWaveEnemyHp(),
+          speed: currentWaveEnemySpeed(),
+          alive: true,
+        });
+        game.spawnQueue--;
+        game.spawnTimer = 0.9;
+      }
+    }
+
+    // Движение врагов по пути.
+    for (const e of game.enemies) {
+      if (!e.alive) continue;
+      e.t += e.speed * dt;
+      if (e.t >= 1) {
+        e.alive = false;
+        game.pointHp -= battleConfig.enemy_damage_to_point;
+        if (game.pointHp <= 0) {
+          game.pointHp = 0;
+          updateHud();
+          finishBattle(false);
+          return;
+        }
+      }
+    }
+
+    // Стрельба башен: без промахов и хедшотов (это Этап 4) — фиксированный урон.
+    for (const tower of game.towers) {
+      tower.cooldown -= dt;
+      if (tower.cooldown > 0) continue;
+
+      let target = null;
+      let bestDist = battleConfig.tower_range;
+      for (const e of game.enemies) {
+        if (!e.alive) continue;
+        const p = pointAtT(e.t);
+        const dist = Math.hypot(p.x - tower.x, p.y - tower.y);
+        if (dist <= bestDist) {
+          bestDist = dist;
+          target = e;
+        }
+      }
+
+      if (target) {
+        target.hp -= battleConfig.tower_damage;
+        tower.cooldown = battleConfig.tower_fire_interval;
+        tower.flashUntil = performance.now() + 90;
+        if (target.hp <= 0) {
+          target.alive = false;
+          game.kills++;
+        }
+      }
+    }
+
+    game.enemies = game.enemies.filter(e => e.alive);
+    updateHud();
+
+    // Волна завершена, когда все враги волны заспавнены, убиты/дошли,
+    // и очередь спавна пуста.
+    if (game.spawnQueue === 0 && game.enemies.length === 0) {
+      if (game.waveClearedAt === null) {
+        game.waveClearedAt = performance.now();
+      } else if (performance.now() - game.waveClearedAt > 900) {
+        if (game.wave >= battleConfig.wave_count) {
+          finishBattle(true);
+        } else {
+          game.wave++;
+          game.waveClearedAt = null;
+          spawnWave();
+        }
+      }
+    }
+  }
+
+  function renderGame() {
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // Дорога.
+    ctx.strokeStyle = '#2a3122';
+    ctx.lineWidth = 26;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(PATH[0].x, PATH[0].y);
+    for (let i = 1; i < PATH.length; i++) ctx.lineTo(PATH[i].x, PATH[i].y);
+    ctx.stroke();
+    ctx.strokeStyle = '#1c211a';
+    ctx.lineWidth = 20;
+    ctx.stroke();
+
+    // Точка (цель) в конце пути.
+    const end = PATH[PATH.length - 1];
+    ctx.font = '28px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(game.side === 't' ? '💣' : '🎯', end.x, end.y);
+
+    // Слоты для построек.
+    for (const spot of BUILD_SPOTS) {
+      const occupied = game.towers.some(t => t.spotX === spot.x && t.spotY === spot.y);
+      if (!occupied) {
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = '#8a6a1f';
+        ctx.lineWidth = 2;
+        ctx.arc(spot.x, spot.y, 16, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Башни (бойцы) + радиус действия + вспышка выстрела.
+    for (const tower of game.towers) {
+      const flashing = performance.now() < tower.flashUntil;
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(224,167,46,0.08)';
+      ctx.arc(tower.x, tower.y, battleConfig.tower_range, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.fillStyle = flashing ? '#f5c451' : '#e0a72e';
+      ctx.arc(tower.x, tower.y, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = '16px sans-serif';
+      ctx.fillStyle = '#0b0d0a';
+      ctx.fillText('🔫', tower.x, tower.y + 1);
+    }
+
+    // Враги + полоска HP.
+    const enemyColor = game.side === 't' ? '#4a90d9' : '#c1462f';
+    for (const e of game.enemies) {
+      const p = pointAtT(e.t);
+      ctx.beginPath();
+      ctx.fillStyle = enemyColor;
+      ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+      ctx.fill();
+
+      const barW = 22;
+      ctx.fillStyle = '#2a3122';
+      ctx.fillRect(p.x - barW / 2, p.y - 20, barW, 4);
+      ctx.fillStyle = '#7fae3f';
+      ctx.fillRect(p.x - barW / 2, p.y - 20, barW * Math.max(0, e.hp / e.maxHp), 4);
+    }
+  }
+
+  async function finishBattle(won) {
+    if (!game || !game.running) return;
+    game.running = false;
+
+    // Если проиграли на волне N (не зачистив её) — засчитываем N-1 полностью
+    // пройденных волн; если это была первая волна — 0.
+    const finalWave = won ? battleConfig.wave_count : Math.max(0, game.wave - 1);
+
+    let rewardInfo = null;
+    try {
+      const res = await fetch('/api/battle/finish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': initData,
+        },
+        body: JSON.stringify({ side: game.side, wave_reached: finalWave, won }),
+      });
+      if (res.ok) rewardInfo = await res.json();
+    } catch (e) {
+      // Даже если сеть подвела — покажем локальный итог боя, просто без наград.
+    }
+
+    showResult(won, finalWave, rewardInfo);
+
+    // Обновлённые данные (баланс, статистика) — сбрасываем кэш, чтобы
+    // Главная/Профиль подтянули их заново при следующем открытии.
+    statsCache = null;
+    battleEl.classList.add('hidden');
+  }
+
+  function showResult(won, finalWave, rewardInfo) {
+    document.getElementById('result-title').textContent = won ? 'Победа' : 'Поражение';
+    document.getElementById('result-title').className = 'result-title ' + (won ? 'win' : 'lose');
+    document.getElementById('result-sub').textContent = `Волна ${finalWave} из ${battleConfig.wave_count}`;
+
+    const coins = rewardInfo ? rewardInfo.reward_coins : 0;
+    const xp = rewardInfo ? rewardInfo.reward_xp : 0;
+    const bestWave = rewardInfo ? rewardInfo.best_wave : finalWave;
+
+    document.getElementById('result-stats').innerHTML = `
+      <div class="stat-card"><div class="val">${game.kills}</div><div class="lbl">Убийств</div></div>
+      <div class="stat-card"><div class="val">+${fmt(coins)}</div><div class="lbl">Монет</div></div>
+      <div class="stat-card"><div class="val">+${fmt(xp)}</div><div class="lbl">Опыта</div></div>
+      <div class="stat-card"><div class="val">${fmt(bestWave)}</div><div class="lbl">Рекорд волн</div></div>
+    `;
+
+    resultEl.classList.remove('hidden');
+
+    if (rewardInfo && rewardInfo.level_info && rewardInfo.level_info.leveled_up && tg?.HapticFeedback) {
+      tg.HapticFeedback.notificationOccurred('success');
+    }
   }
 
   // ---------- Магазин ----------

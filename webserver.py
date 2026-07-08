@@ -42,6 +42,40 @@ def _load_cases() -> list:
     return _CASES_CACHE
 
 
+# ---------- Конфиг боя (Этап 3, MVP игрового цикла) ----------
+#
+# Единственный источник правды по балансу боя. Фронтенд (webapp/index.html)
+# запрашивает его через /api/battle/config и симулирует бой ЛОКАЛЬНО на
+# Canvas (сервер не участвует в реальном времени боя — это нормально для
+# однопользовательской PvE-волны). Когда бой заканчивается, фронтенд шлёт
+# в /api/battle/finish только итог (side, wave_reached, won), а награда
+# считается здесь же, на сервере, по тем же цифрам — чтобы игрок не мог
+# подделать монеты, изменив число в браузере.
+#
+# Броня/каска/промахи/хедшоты сюда сознательно не добавлены — это Этап 4.
+# Экономика самих башен (стоимость, редкость, апгрейды) — Этапы 5-7,
+# поэтому пока башни бесплатны и одинаковы (пока только один тип бойца).
+BATTLE_CONFIG = {
+    "wave_count": 5,
+    "point_hp": 100,
+    "enemy_damage_to_point": 10,
+    "base_enemy_count": 6,
+    "enemy_count_step": 2,
+    "base_enemy_hp": 40,
+    "enemy_hp_step": 15,
+    "base_enemy_speed": 0.09,   # доля пути в секунду
+    "enemy_speed_step": 0.01,
+    "max_towers": 4,
+    "tower_range": 150,
+    "tower_fire_interval": 0.6,  # секунд между выстрелами
+    "tower_damage": 18,
+    "reward_per_wave": 15,
+    "reward_win_bonus": 50,
+    "xp_per_wave": 3,
+    "xp_win_bonus": 15,
+}
+
+
 def _check_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
     """Проверяет подпись initData, которую Telegram Web App передаёт на
     фронтенде. Это единственный способ убедиться, что запрос реально
@@ -186,6 +220,9 @@ async def handle_stats(request: web.Request) -> web.Response:
         "items_total_value": full["items_total_value"],
         "best_item_name": full["best_item_name"],
         "best_item_price": full["best_item_price"],
+        "td_battles_played": user["td_battles_played"] or 0,
+        "td_wins": user["td_wins"] or 0,
+        "td_best_wave": user["td_best_wave"] or 0,
     })
 
 
@@ -218,6 +255,71 @@ async def handle_shop_cases(request: web.Request) -> web.Response:
     return web.json_response({"cases": preview})
 
 
+async def handle_battle_config(request: web.Request) -> web.Response:
+    """Отдаёт баланс боя (волны/HP/урон/характеристики башни), чтобы
+    фронтенд не хардкодил цифры отдельно от сервера — правится в одном
+    месте (BATTLE_CONFIG выше)."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    return web.json_response(BATTLE_CONFIG)
+
+
+async def handle_battle_finish(request: web.Request) -> web.Response:
+    """Принимает итог одного боя от клиента (сторона, до какой волны
+    дошёл, победа/поражение) и начисляет награду СЕРВЕРНЫМ расчётом —
+    клиент не может просто прислать произвольное число монет.
+
+    Бой целиком идёт на Canvas в браузере (это однопользовательская
+    PvE-волна, серверу незачем гонять тот же цикл ещё раз), поэтому
+    полноценной защиты от накрутки (повторной отправки, скорости игры
+    и т.д.) здесь пока нет — это нормально для тестового Этапа 3.
+    Прежде чем давать реальную ценность наградам, на одном из следующих
+    этапов стоит добавить идемпотентность (id боя) и серверную валидацию
+    таймингов."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    side = payload.get("side")
+    won = bool(payload.get("won"))
+    try:
+        wave_reached = int(payload.get("wave_reached", 0))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "invalid_wave_reached"}, status=400)
+
+    if side not in ("t", "ct"):
+        return web.json_response({"error": "invalid_side"}, status=400)
+
+    # Клампим на случай, если с фронтенда прилетит бессмысленное число.
+    wave_reached = max(0, min(wave_reached, BATTLE_CONFIG["wave_count"]))
+
+    reward_coins = wave_reached * BATTLE_CONFIG["reward_per_wave"]
+    reward_xp = wave_reached * BATTLE_CONFIG["xp_per_wave"]
+    if won:
+        reward_coins += BATTLE_CONFIG["reward_win_bonus"]
+        reward_xp += BATTLE_CONFIG["xp_win_bonus"]
+
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+    result = db.record_td_battle_result(user_id, wave_reached, won, reward_coins, reward_xp)
+
+    return web.json_response({
+        "reward_coins": reward_coins,
+        "reward_xp": reward_xp,
+        "best_wave": result["best_wave"],
+        "balance": db.get_balance(user_id),
+        "level_info": result["xp_result"],
+    })
+
+
 async def handle_index(request: web.Request) -> web.Response:
     # aiohttp's add_static НЕ отдаёт index.html автоматически на "/" —
     # он трактует "/" как запрос к самой папке и при show_index=False
@@ -231,6 +333,8 @@ def create_app() -> web.Application:
     app.router.add_get("/api/inventory", handle_inventory)
     app.router.add_get("/api/stats", handle_stats)
     app.router.add_get("/api/shop/cases", handle_shop_cases)
+    app.router.add_get("/api/battle/config", handle_battle_config)
+    app.router.add_post("/api/battle/finish", handle_battle_finish)
     app.router.add_get("/", handle_index)
     # Всё остальное (css, js, картинки) — статика самой игры.
     app.router.add_static("/", WEBAPP_DIR, show_index=False)
