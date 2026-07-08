@@ -25,6 +25,21 @@ import config
 import database as db
 
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+
+# Кейсы читаем один раз при старте процесса и держим в памяти — это тот же
+# файл, которым пользуется handlers/cases.py, так что список в Web App
+# всегда совпадает с тем, что реально можно открыть в боте.
+_CASES_CACHE: list | None = None
+
+
+def _load_cases() -> list:
+    global _CASES_CACHE
+    if _CASES_CACHE is None:
+        cases_path = os.path.join(STATIC_DIR, "cases.json")
+        with open(cases_path, "r", encoding="utf-8") as f:
+            _CASES_CACHE = json.load(f)
+    return _CASES_CACHE
 
 
 def _check_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
@@ -72,12 +87,23 @@ def _get_init_data_from_request(request: web.Request) -> str:
     return request.headers.get("X-Telegram-Init-Data", "")
 
 
-async def handle_me(request: web.Request) -> web.Response:
+def _authenticate(request: web.Request) -> dict | None:
+    """Общая проверка подписи для всех защищённых эндпоинтов. Возвращает
+    словарь Telegram-пользователя (id, username, ...) или None, если
+    initData отсутствует/невалиден — тогда вызывающий обработчик сам
+    должен вернуть 401."""
     init_data = _get_init_data_from_request(request)
-    user_data = _check_telegram_init_data(init_data, config.BOT_TOKEN)
+    return _check_telegram_init_data(init_data, config.BOT_TOKEN)
 
+
+def _unauthorized() -> web.Response:
+    return web.json_response({"error": "invalid_init_data"}, status=401)
+
+
+async def handle_me(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
     if user_data is None:
-        return web.json_response({"error": "invalid_init_data"}, status=401)
+        return _unauthorized()
 
     user_id = user_data["id"]
     username = user_data.get("username") or user_data.get("first_name") or f"id{user_id}"
@@ -96,6 +122,102 @@ async def handle_me(request: web.Request) -> web.Response:
     })
 
 
+async def handle_inventory(request: web.Request) -> web.Response:
+    """Отдаёт реальный инвентарь игрока — те же предметы, что видны
+    в боте через "📦 Инвентарь" (handlers/inventory.py), одна и та же
+    таблица inventory в БД."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    rows = db.get_inventory(user_id)
+
+    items = [
+        {
+            "id": row["id"],
+            "name": row["item_name"],
+            "rarity": row["item_rarity"],
+            "price": row["item_price"],
+            "obtained_at": row["obtained_at"],
+        }
+        for row in rows
+    ]
+
+    return web.json_response({
+        "items": items,
+        "count": len(items),
+        "total_value": sum(i["price"] for i in items),
+    })
+
+
+async def handle_stats(request: web.Request) -> web.Response:
+    """Отдаёт подробную статистику игрока — те же цифры, что доступны
+    в боте через "👤 Профиль" (handlers/stats.py)."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    full = db.get_user_full_stats(user_id)
+    user = full["user"]
+
+    if user is None:
+        return web.json_response({"error": "user_not_found"}, status=404)
+
+    level_info = db.get_level_info(user_id)
+
+    return web.json_response({
+        "level": level_info["level"],
+        "xp": level_info["xp"],
+        "xp_needed": level_info["xp_needed"],
+        "balance": user["balance"],
+        "total_earned": user["total_earned"] or 0,
+        "total_spent": user["total_spent"] or 0,
+        "cases_opened": user["cases_opened"] or 0,
+        "duels_played": user["duels_played"] or 0,
+        "duels_won": user["duels_won"] or 0,
+        "upgrades_success": user["upgrades_success"] or 0,
+        "upgrades_failed": user["upgrades_failed"] or 0,
+        "jackpot_wins": user["jackpot_wins"] or 0,
+        "work_correct": user["work_correct"] or 0,
+        "work_wrong": user["work_wrong"] or 0,
+        "items_count": full["items_count"],
+        "items_total_value": full["items_total_value"],
+        "best_item_name": full["best_item_name"],
+        "best_item_price": full["best_item_price"],
+    })
+
+
+async def handle_shop_cases(request: web.Request) -> web.Response:
+    """Отдаёт список кейсов (тот же static/cases.json, которым пользуется
+    handlers/cases.py) — пока только для просмотра. Сама покупка/открытие
+    кейса прямо из Web App появится на Этапе 7 ("Скины + магазин за
+    монеты"); сейчас кейсы по-прежнему открываются командой в боте."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    cases = _load_cases()
+    # Наружу отдаём укороченную витрину: без весов дропа (это внутренняя
+    # механика шанса) и не более 4 примеров предметов на кейс.
+    preview = []
+    for case in cases:
+        items_sorted = sorted(case["items"], key=lambda i: i["price"], reverse=True)
+        preview.append({
+            "id": case["id"],
+            "name": case["name"],
+            "price": case["price"],
+            "min_level": case["min_level"],
+            "sample_items": [
+                {"name": i["name"], "rarity": i["rarity"], "price": i["price"]}
+                for i in items_sorted[:4]
+            ],
+        })
+
+    return web.json_response({"cases": preview})
+
+
 async def handle_index(request: web.Request) -> web.Response:
     # aiohttp's add_static НЕ отдаёт index.html автоматически на "/" —
     # он трактует "/" как запрос к самой папке и при show_index=False
@@ -106,6 +228,9 @@ async def handle_index(request: web.Request) -> web.Response:
 def create_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/api/me", handle_me)
+    app.router.add_get("/api/inventory", handle_inventory)
+    app.router.add_get("/api/stats", handle_stats)
+    app.router.add_get("/api/shop/cases", handle_shop_cases)
     app.router.add_get("/", handle_index)
     # Всё остальное (css, js, картинки) — статика самой игры.
     app.router.add_static("/", WEBAPP_DIR, show_index=False)

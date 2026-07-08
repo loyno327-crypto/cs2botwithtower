@@ -10,11 +10,15 @@
     --bg-0:#0b0d0a;
     --bg-1:#12150f;
     --panel:#171b13;
+    --panel-2:#1c211a;
     --line:#2a3122;
     --amber:#e0a72e;
     --amber-dim:#8a6a1f;
     --green:#7fae3f;
     --red:#c1462f;
+    --blue:#4a90d9;
+    --purple:#9b59b6;
+    --pink:#e06bb5;
     --text:#e8e6dc;
     --text-dim:#8a8d80;
     --mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
@@ -39,6 +43,7 @@
     padding:14px 16px 10px;
     border-bottom:1px solid var(--line);
     background:linear-gradient(180deg, var(--bg-1), transparent);
+    position:sticky; top:0; z-index:9;
   }
   .hud-top{display:flex; align-items:center; justify-content:space-between;}
   .brand{
@@ -74,6 +79,7 @@
     border:1px solid var(--line);
     display:flex; align-items:center; justify-content:center;
     font-family:var(--mono); font-weight:600; color:var(--amber); font-size:16px;
+    flex-shrink:0;
   }
   .profile-info{flex:1; min-width:0;}
   .profile-name{font-size:17px; font-weight:600; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -83,7 +89,7 @@
   }
   .profile-meta span b{color:var(--amber);}
   .balance{
-    text-align:right; font-family:var(--mono);
+    text-align:right; font-family:var(--mono); flex-shrink:0;
   }
   .balance .num{font-size:19px; font-weight:600; color:var(--amber);}
   .balance .lbl{font-size:9px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase;}
@@ -95,10 +101,15 @@
 
   main{flex:1; padding:16px; padding-bottom:90px;}
 
+  .view{display:none;}
+  .view.active{display:block; animation:fadein .25s ease;}
+  @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
   .section-title{
     font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--text-dim);
-    text-transform:uppercase; margin:18px 0 8px;
+    text-transform:uppercase; margin:0 0 10px;
   }
+  .section-title.spaced{margin-top:20px;}
 
   .placeholder-panel{
     background:var(--panel); border:1px solid var(--line); border-radius:4px;
@@ -106,6 +117,119 @@
     font-family:var(--mono); font-size:12px; line-height:1.6;
   }
   .placeholder-panel .big{font-size:28px; margin-bottom:8px; display:block;}
+
+  .loading-line{
+    font-family:var(--mono); font-size:11px; color:var(--text-dim); text-align:center; padding:40px 0;
+  }
+  .error-line{
+    font-family:var(--mono); font-size:11px; color:var(--red); text-align:center; padding:24px 12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:4px; line-height:1.6;
+  }
+
+  /* ---- Главная: статистика-плитки ---- */
+  .stat-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  }
+  .stat-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:12px; border-top:2px solid var(--amber-dim);
+  }
+  .stat-card .val{font-family:var(--mono); font-size:20px; font-weight:600; color:var(--amber);}
+  .stat-card .lbl{font-size:11px; color:var(--text-dim); margin-top:2px; text-transform:uppercase; letter-spacing:.5px;}
+
+  .roadmap-panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:14px;
+    font-size:13.5px; line-height:1.55; color:var(--text-dim);
+  }
+  .roadmap-panel b{color:var(--text);}
+  .roadmap-panel .tag{
+    display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:1.5px;
+    color:var(--amber); border:1px solid var(--amber-dim); border-radius:3px; padding:2px 6px;
+    margin-bottom:8px; text-transform:uppercase;
+  }
+
+  /* ---- Играть: выбор стороны ---- */
+  .side-grid{display:flex; gap:10px;}
+  .side-card{
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:20px 12px; text-align:center; cursor:pointer; transition:.15s;
+  }
+  .side-card .icon{font-size:30px; display:block; margin-bottom:6px;}
+  .side-card .name{font-weight:600; font-size:16px;}
+  .side-card .desc{font-size:11px; color:var(--text-dim); margin-top:4px; line-height:1.4;}
+  .side-card.t{border-top:3px solid var(--red);}
+  .side-card.ct{border-top:3px solid var(--blue);}
+  .side-card.selected.t{background:rgba(193,70,47,0.12); border-color:var(--red);}
+  .side-card.selected.ct{background:rgba(74,144,217,0.12); border-color:var(--blue);}
+
+  .play-note{
+    margin-top:12px; background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:12px 14px; font-family:var(--mono); font-size:11.5px; color:var(--text-dim); line-height:1.6;
+  }
+  .play-note b{color:var(--amber);}
+  .btn-primary{
+    margin-top:14px; width:100%; padding:13px; border:none; border-radius:4px;
+    background:var(--amber-dim); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:14px; letter-spacing:.5px; text-transform:uppercase; cursor:pointer; opacity:.55;
+  }
+  .btn-primary.ready{background:var(--amber); opacity:1;}
+
+  /* ---- Магазин: кейсы ---- */
+  .case-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:14px; margin-bottom:10px;
+  }
+  .case-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .case-name{font-size:15.5px; font-weight:600;}
+  .case-price{font-family:var(--mono); color:var(--amber); font-size:13px; font-weight:600;}
+  .case-meta{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-bottom:10px; letter-spacing:.5px;}
+  .chip-row{display:flex; flex-wrap:wrap; gap:6px;}
+  .chip{
+    font-family:var(--mono); font-size:10.5px; padding:4px 8px; border-radius:3px;
+    background:var(--panel-2); border-left:2px solid var(--line); color:var(--text-dim);
+  }
+  .chip b{color:var(--text);}
+  .shop-hint{
+    text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+    margin-top:6px; padding-bottom:4px;
+  }
+
+  /* ---- Инвентарь ---- */
+  .item-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:10px 12px; margin-bottom:8px; border-left:3px solid var(--line);
+  }
+  .item-row.rarity-militari{border-left-color:var(--blue);}
+  .item-row.rarity-zapreshennoe{border-left-color:var(--purple);}
+  .item-row.rarity-zasekrechennoe{border-left-color:var(--pink);}
+  .item-row.rarity-taynoe{border-left-color:var(--red);}
+  .item-row.rarity-redkiy{border-left-color:var(--amber);}
+  .item-name{font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .item-rarity{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px;}
+  .item-price{font-family:var(--mono); font-size:13px; color:var(--amber); white-space:nowrap;}
+  .inv-summary{
+    display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px;
+    color:var(--text-dim); margin-bottom:10px; padding:0 2px;
+  }
+  .inv-summary b{color:var(--text);}
+
+  /* ---- Профиль ---- */
+  .profile-stat-list{background:var(--panel); border:1px solid var(--line); border-radius:4px; overflow:hidden;}
+  .profile-stat-row{
+    display:flex; justify-content:space-between; padding:11px 14px;
+    border-bottom:1px solid var(--line); font-size:13.5px;
+  }
+  .profile-stat-row:last-child{border-bottom:none;}
+  .profile-stat-row .k{color:var(--text-dim);}
+  .profile-stat-row .v{font-family:var(--mono); font-weight:600; color:var(--text);}
+  .best-item-panel{
+    margin-top:12px; background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--amber);
+    border-radius:4px; padding:12px 14px;
+  }
+  .best-item-panel .lbl{font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:1.5px; text-transform:uppercase;}
+  .best-item-panel .name{font-size:15px; font-weight:600; margin-top:4px;}
+  .best-item-panel .price{font-family:var(--mono); color:var(--amber); font-size:13px; margin-top:2px;}
 
   nav.tabbar{
     position:fixed; left:0; right:0; bottom:0;
@@ -122,10 +246,6 @@
   .tab .icon{font-size:18px; line-height:1;}
   .tab.active{color:var(--amber);}
   .tab.active .icon{filter:drop-shadow(0 0 4px rgba(224,167,46,.5));}
-
-  .loading-line{
-    font-family:var(--mono); font-size:11px; color:var(--text-dim); text-align:center; padding:40px 0;
-  }
 </style>
 </head>
 <body>
@@ -133,7 +253,7 @@
 <header class="hud">
   <div class="hud-top">
     <div class="brand"><span class="status-dot"></span><b>OPS</b> DEFENCE // WEB APP</div>
-    <div class="brand" id="stage-tag">STAGE 1</div>
+    <div class="brand" id="stage-tag">STAGE 2</div>
   </div>
 
   <div class="profile-card" id="profile-card">
@@ -142,19 +262,81 @@
 </header>
 
 <main id="main">
-  <div class="section-title">Главная</div>
-  <div class="placeholder-panel">
-    <span class="big">🛰️</span>
-    Этап 1: каркас связи Web App ↔ бот.<br>
-    Игровые вкладки появятся на следующих этапах.
+
+  <!-- ГЛАВНАЯ -->
+  <div class="view active" id="view-home">
+    <div class="section-title">Главная</div>
+    <div class="stat-grid" id="home-stats">
+      <div class="loading-line" style="grid-column:1/-1;">загрузка статистики…</div>
+    </div>
+
+    <div class="section-title spaced">Что дальше</div>
+    <div class="roadmap-panel">
+      <span class="tag">Этап 2 из 10</span><br>
+      Сейчас собран каркас интерфейса: реальные данные из бота (баланс,
+      инвентарь, статистика) уже видны прямо здесь, в Web App.<br><br>
+      На <b>Этапе 3</b> появится первый играбельный бой: одна карта, точка,
+      волны врагов — без промахов и хедшотов, только базовый цикл
+      "разместил бойца → отбил волну".
+    </div>
   </div>
+
+  <!-- ИГРАТЬ -->
+  <div class="view" id="view-play">
+    <div class="section-title">Играть</div>
+    <div class="side-grid">
+      <div class="side-card t" data-side="t">
+        <span class="icon">🔴</span>
+        <div class="name">Террористы</div>
+        <div class="desc">Бомба уже установлена. Удержи точку и отбей все волны.</div>
+      </div>
+      <div class="side-card ct" data-side="ct">
+        <span class="icon">🔵</span>
+        <div class="name">Контр-террористы</div>
+        <div class="desc">Не дай врагу дойти до точки и поставить бомбу.</div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="play-btn">Выбери сторону</button>
+
+    <div class="play-note">
+      <b>Этап 2:</b> здесь пока только выбор стороны — сам бой (башни-бойцы,
+      волны врагов, стрельба) появится на Этапе 3. Твой выбор запомнится
+      и будет использован, когда бой станет доступен.
+    </div>
+  </div>
+
+  <!-- МАГАЗИН -->
+  <div class="view" id="view-shop">
+    <div class="section-title">Магазин</div>
+    <div id="shop-list">
+      <div class="loading-line">загрузка кейсов…</div>
+    </div>
+  </div>
+
+  <!-- ИНВЕНТАРЬ -->
+  <div class="view" id="view-inventory">
+    <div class="section-title">Инвентарь</div>
+    <div id="inventory-list">
+      <div class="loading-line">загрузка инвентаря…</div>
+    </div>
+  </div>
+
+  <!-- ПРОФИЛЬ -->
+  <div class="view" id="view-profile">
+    <div class="section-title">Профиль</div>
+    <div id="profile-stats">
+      <div class="loading-line">загрузка профиля…</div>
+    </div>
+  </div>
+
 </main>
 
 <nav class="tabbar">
   <button class="tab active" data-tab="home"><span class="icon">🏠</span>Главная</button>
   <button class="tab" data-tab="play"><span class="icon">🎮</span>Играть</button>
   <button class="tab" data-tab="shop"><span class="icon">🛒</span>Магазин</button>
-  <button class="tab" data-tab="inv"><span class="icon">🎒</span>Инвентарь</button>
+  <button class="tab" data-tab="inventory"><span class="icon">🎒</span>Инвентарь</button>
   <button class="tab" data-tab="profile"><span class="icon">👤</span>Профиль</button>
 </nav>
 
@@ -169,15 +351,40 @@
 
   const initData = tg?.initData || '';
 
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
+  }
+
+  function fmt(n) {
+    return Number(n || 0).toLocaleString('ru-RU');
+  }
+
+  // Ключ для CSS-класса рамки по редкости предмета (соответствует
+  // RARITY_EMOJI в handlers/cases.py и handlers/inventory.py).
+  function rarityClass(rarity) {
+    const map = {
+      'Милитари': 'rarity-militari',
+      'Запрещённое': 'rarity-zapreshennoe',
+      'Засекреченное': 'rarity-zasekrechennoe',
+      'Тайное': 'rarity-taynoe',
+      'Редкий спецпредмет': 'rarity-redkiy',
+    };
+    return map[rarity] || '';
+  }
+
+  async function apiGet(path) {
+    const res = await fetch(path, { headers: { 'X-Telegram-Init-Data': initData } });
+    if (!res.ok) throw new Error('request_failed:' + path);
+    return res.json();
+  }
+
+  // ---------- Шапка профиля ----------
   async function loadProfile() {
     const card = document.getElementById('profile-card');
     try {
-      const res = await fetch('/api/me', {
-        headers: { 'X-Telegram-Init-Data': initData }
-      });
-      if (!res.ok) throw new Error('auth_failed');
-      const data = await res.json();
-
+      const data = await apiGet('/api/me');
       const initials = (data.username || '?').slice(0, 2).toUpperCase();
       const xpPercent = data.xp_needed ? Math.min(100, Math.round((data.xp / data.xp_needed) * 100)) : 0;
 
@@ -192,7 +399,7 @@
           <div class="xp-track"><div class="xp-fill" style="width:${xpPercent}%"></div></div>
         </div>
         <div class="balance">
-          <div class="num">${data.balance.toLocaleString('ru-RU')}</div>
+          <div class="num">${fmt(data.balance)}</div>
           <div class="lbl">монет</div>
         </div>
       `;
@@ -203,23 +410,178 @@
     }
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  // ---------- Главная ----------
+  let statsCache = null;
+  async function getStats() {
+    if (!statsCache) statsCache = await apiGet('/api/stats');
+    return statsCache;
   }
+
+  async function renderHome() {
+    const el = document.getElementById('home-stats');
+    try {
+      const s = await getStats();
+      el.innerHTML = `
+        <div class="stat-card"><div class="val">${fmt(s.total_earned)}</div><div class="lbl">Заработано всего</div></div>
+        <div class="stat-card"><div class="val">${fmt(s.cases_opened)}</div><div class="lbl">Кейсов открыто</div></div>
+        <div class="stat-card"><div class="val">${fmt(s.duels_played)}</div><div class="lbl">Дуэлей сыграно</div></div>
+        <div class="stat-card"><div class="val">${fmt(s.upgrades_success)}</div><div class="lbl">Апгрейдов успешно</div></div>
+      `;
+    } catch (e) {
+      el.innerHTML = `<div class="error-line" style="grid-column:1/-1;">не удалось загрузить статистику</div>`;
+    }
+  }
+
+  // ---------- Играть (пока — только выбор стороны) ----------
+  function initPlayTab() {
+    const cards = document.querySelectorAll('.side-card');
+    const btn = document.getElementById('play-btn');
+    let selected = localStorage.getItem?.('ops_side') || null; // на случай если localStorage недоступен — просто null
+
+    function apply() {
+      cards.forEach(c => c.classList.toggle('selected', c.dataset.side === selected));
+      if (selected) {
+        btn.textContent = selected === 't' ? 'Сторона: Террористы ✓' : 'Сторона: Контр-террористы ✓';
+        btn.classList.add('ready');
+      } else {
+        btn.textContent = 'Выбери сторону';
+        btn.classList.remove('ready');
+      }
+    }
+
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        selected = card.dataset.side;
+        try { localStorage.setItem('ops_side', selected); } catch (e) {}
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        apply();
+      });
+    });
+
+    apply();
+  }
+
+  // ---------- Магазин ----------
+  let shopLoaded = false;
+  async function renderShop() {
+    if (shopLoaded) return;
+    const el = document.getElementById('shop-list');
+    try {
+      const data = await apiGet('/api/shop/cases');
+      const cardsHtml = data.cases.map(c => `
+        <div class="case-card">
+          <div class="case-head">
+            <div class="case-name">${escapeHtml(c.name)}</div>
+            <div class="case-price">${fmt(c.price)} монет</div>
+          </div>
+          <div class="case-meta">МИН. УРОВЕНЬ ${c.min_level}</div>
+          <div class="chip-row">
+            ${c.sample_items.map(i => `<span class="chip">${escapeHtml(i.name)} <b>${fmt(i.price)}</b></span>`).join('')}
+          </div>
+        </div>
+      `).join('');
+      el.innerHTML = cardsHtml + `<div class="shop-hint">Открытие кейсов пока доступно в самом боте (/cases) — прямая покупка из Web App появится на Этапе 7.</div>`;
+      shopLoaded = true;
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить магазин</div>`;
+    }
+  }
+
+  // ---------- Инвентарь ----------
+  let inventoryLoaded = false;
+  async function renderInventory() {
+    if (inventoryLoaded) return;
+    const el = document.getElementById('inventory-list');
+    try {
+      const data = await apiGet('/api/inventory');
+      if (data.items.length === 0) {
+        el.innerHTML = `<div class="placeholder-panel"><span class="big">🎒</span>Инвентарь пуст.<br>Открой кейс в боте, чтобы получить первый предмет.</div>`;
+      } else {
+        const summary = `<div class="inv-summary"><span>Предметов: <b>${data.count}</b></span><span>Стоимость: <b>${fmt(data.total_value)}</b></span></div>`;
+        const rows = data.items.map(i => `
+          <div class="item-row ${rarityClass(i.rarity)}">
+            <div>
+              <div class="item-name">${escapeHtml(i.name)}</div>
+              <div class="item-rarity">${escapeHtml(i.rarity)}</div>
+            </div>
+            <div class="item-price">${fmt(i.price)}</div>
+          </div>
+        `).join('');
+        el.innerHTML = summary + rows;
+      }
+      inventoryLoaded = true;
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить инвентарь</div>`;
+    }
+  }
+
+  // ---------- Профиль ----------
+  async function renderProfileTab() {
+    const el = document.getElementById('profile-stats');
+    try {
+      const s = await getStats();
+      const rows = [
+        ['Уровень', s.level],
+        ['Опыт', `${fmt(s.xp)} / ${fmt(s.xp_needed)}`],
+        ['Баланс', fmt(s.balance)],
+        ['Заработано всего', fmt(s.total_earned)],
+        ['Потрачено всего', fmt(s.total_spent)],
+        ['Кейсов открыто', fmt(s.cases_opened)],
+        ['Дуэлей сыграно', fmt(s.duels_played)],
+        ['Дуэлей выиграно', fmt(s.duels_won)],
+        ['Апгрейдов успешно', fmt(s.upgrades_success)],
+        ['Апгрейдов неудачно', fmt(s.upgrades_failed)],
+        ['Побед в джекпоте', fmt(s.jackpot_wins)],
+        ['Предметов в инвентаре', fmt(s.items_count)],
+      ];
+      let html = `<div class="profile-stat-list">` +
+        rows.map(([k, v]) => `<div class="profile-stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') +
+        `</div>`;
+
+      if (s.best_item_name) {
+        html += `
+          <div class="best-item-panel">
+            <div class="lbl">Лучший предмет</div>
+            <div class="name">${escapeHtml(s.best_item_name)}</div>
+            <div class="price">${fmt(s.best_item_price)} монет</div>
+          </div>
+        `;
+      }
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить профиль</div>`;
+    }
+  }
+
+  // ---------- Навигация по вкладкам ----------
+  const tabRenderers = {
+    home: renderHome,
+    play: () => {}, // сторона выбирается локально, перерисовка не нужна
+    shop: renderShop,
+    inventory: renderInventory,
+    profile: renderProfileTab,
+  };
 
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
+      const tabId = btn.dataset.tab;
+
       document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-' + tabId).classList.add('active');
+
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-      // Разделы "Играть/Магазин/Инвентарь/Профиль" подключим на следующих этапах —
-      // сейчас переключение вкладок просто визуальное.
+
+      const renderer = tabRenderers[tabId];
+      if (renderer) renderer();
     });
   });
 
   loadProfile();
+  renderHome();
+  initPlayTab();
 </script>
 
 </body>
