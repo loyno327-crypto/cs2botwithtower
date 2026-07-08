@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ops Defence</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg-0:#0b0d0a;
+    --bg-1:#12150f;
+    --panel:#171b13;
+    --line:#2a3122;
+    --amber:#e0a72e;
+    --amber-dim:#8a6a1f;
+    --green:#7fae3f;
+    --red:#c1462f;
+    --text:#e8e6dc;
+    --text-dim:#8a8d80;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+    --sans: 'Barlow Condensed', Arial, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; height:100%; background:var(--bg-0); color:var(--text); font-family:var(--sans); overscroll-behavior:none;}
+
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(224,167,46,0.06), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px),
+      var(--bg-0);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
+  header.hud{
+    padding:14px 16px 10px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, var(--bg-1), transparent);
+  }
+  .hud-top{display:flex; align-items:center; justify-content:space-between;}
+  .brand{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:3px;
+    color:var(--amber-dim);
+    text-transform:uppercase;
+  }
+  .brand b{color:var(--amber);}
+  .status-dot{
+    width:6px; height:6px; border-radius:50%; background:var(--green);
+    box-shadow:0 0 6px var(--green);
+    display:inline-block; margin-right:6px;
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.4;}}
+
+  .profile-card{
+    margin-top:12px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-left:3px solid var(--amber);
+    border-radius:4px;
+    padding:12px 14px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .avatar{
+    width:42px; height:42px; border-radius:4px;
+    background:linear-gradient(135deg, #2b3320, #1a1f14);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:600; color:var(--amber); font-size:16px;
+  }
+  .profile-info{flex:1; min-width:0;}
+  .profile-name{font-size:17px; font-weight:600; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .profile-meta{
+    font-family:var(--mono); font-size:11px; color:var(--text-dim);
+    margin-top:3px; display:flex; gap:10px; flex-wrap:wrap;
+  }
+  .profile-meta span b{color:var(--amber);}
+  .balance{
+    text-align:right; font-family:var(--mono);
+  }
+  .balance .num{font-size:19px; font-weight:600; color:var(--amber);}
+  .balance .lbl{font-size:9px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase;}
+
+  .xp-track{
+    margin-top:10px; height:4px; background:var(--line); border-radius:2px; overflow:hidden;
+  }
+  .xp-fill{height:100%; background:linear-gradient(90deg, var(--amber-dim), var(--amber)); width:0%; transition:width .6s ease;}
+
+  main{flex:1; padding:16px; padding-bottom:90px;}
+
+  .section-title{
+    font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--text-dim);
+    text-transform:uppercase; margin:18px 0 8px;
+  }
+
+  .placeholder-panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:26px 16px; text-align:center; color:var(--text-dim);
+    font-family:var(--mono); font-size:12px; line-height:1.6;
+  }
+  .placeholder-panel .big{font-size:28px; margin-bottom:8px; display:block;}
+
+  nav.tabbar{
+    position:fixed; left:0; right:0; bottom:0;
+    background:var(--bg-1); border-top:1px solid var(--line);
+    display:flex; padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+    z-index:10;
+  }
+  .tab{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:6px 2px; border:none; background:none; color:var(--text-dim);
+    font-family:var(--sans); font-size:10.5px; font-weight:600; letter-spacing:.3px;
+    text-transform:uppercase; cursor:pointer;
+  }
+  .tab .icon{font-size:18px; line-height:1;}
+  .tab.active{color:var(--amber);}
+  .tab.active .icon{filter:drop-shadow(0 0 4px rgba(224,167,46,.5));}
+
+  .loading-line{
+    font-family:var(--mono); font-size:11px; color:var(--text-dim); text-align:center; padding:40px 0;
+  }
+</style>
+</head>
+<body>
+
+<header class="hud">
+  <div class="hud-top">
+    <div class="brand"><span class="status-dot"></span><b>OPS</b> DEFENCE // WEB APP</div>
+    <div class="brand" id="stage-tag">STAGE 1</div>
+  </div>
+
+  <div class="profile-card" id="profile-card">
+    <div class="loading-line" id="loading-line" style="flex:1;">подключение к серверу…</div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="section-title">Главная</div>
+  <div class="placeholder-panel">
+    <span class="big">🛰️</span>
+    Этап 1: каркас связи Web App ↔ бот.<br>
+    Игровые вкладки появятся на следующих этапах.
+  </div>
+</main>
+
+<nav class="tabbar">
+  <button class="tab active" data-tab="home"><span class="icon">🏠</span>Главная</button>
+  <button class="tab" data-tab="play"><span class="icon">🎮</span>Играть</button>
+  <button class="tab" data-tab="shop"><span class="icon">🛒</span>Магазин</button>
+  <button class="tab" data-tab="inv"><span class="icon">🎒</span>Инвентарь</button>
+  <button class="tab" data-tab="profile"><span class="icon">👤</span>Профиль</button>
+</nav>
+
+<script>
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    if (tg.setHeaderColor) tg.setHeaderColor('#0b0d0a');
+    if (tg.setBackgroundColor) tg.setBackgroundColor('#0b0d0a');
+  }
+
+  const initData = tg?.initData || '';
+
+  async function loadProfile() {
+    const card = document.getElementById('profile-card');
+    try {
+      const res = await fetch('/api/me', {
+        headers: { 'X-Telegram-Init-Data': initData }
+      });
+      if (!res.ok) throw new Error('auth_failed');
+      const data = await res.json();
+
+      const initials = (data.username || '?').slice(0, 2).toUpperCase();
+      const xpPercent = data.xp_needed ? Math.min(100, Math.round((data.xp / data.xp_needed) * 100)) : 0;
+
+      card.innerHTML = `
+        <div class="avatar">${initials}</div>
+        <div class="profile-info">
+          <div class="profile-name">${escapeHtml(data.username)}</div>
+          <div class="profile-meta">
+            <span>УРОВЕНЬ <b>${data.level}</b></span>
+            <span>XP <b>${data.xp}</b>/${data.xp_needed}</span>
+          </div>
+          <div class="xp-track"><div class="xp-fill" style="width:${xpPercent}%"></div></div>
+        </div>
+        <div class="balance">
+          <div class="num">${data.balance.toLocaleString('ru-RU')}</div>
+          <div class="lbl">монет</div>
+        </div>
+      `;
+    } catch (e) {
+      card.innerHTML = `<div class="loading-line" style="flex:1; color:var(--red);">
+        не удалось получить данные — открой Web App через кнопку в боте, не в обычном браузере
+      </div>`;
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      // Разделы "Играть/Магазин/Инвентарь/Профиль" подключим на следующих этапах —
+      // сейчас переключение вкладок просто визуальное.
+    });
+  });
+
+  loadProfile();
+</script>
+
+</body>
+</html>
