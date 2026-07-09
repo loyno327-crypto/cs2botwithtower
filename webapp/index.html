@@ -537,6 +537,22 @@
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
   }
   .case-reel-card .price{font-family:var(--mono); font-size:10px; color:var(--amber); font-weight:600;}
+
+  /* ---- Кейсы: несколько лент сразу (открытие пачкой х5) ---- */
+  .case-reel-wrap.multi{max-width:340px; padding:14px 0;}
+  .case-reel-lanes{display:flex; flex-direction:column; gap:8px; padding:0 14px;}
+  .case-reel-lane{position:relative;}
+  .case-reel-lane .case-reel-viewport{height:64px;}
+  .case-reel-lane .case-reel-pointer::before{border-width:5px; border-top-width:6px; top:-1px;}
+  .case-reel-lane .case-reel-track{gap:7px;}
+  .case-reel-lane .case-reel-card{
+    flex:0 0 60px; width:60px; height:64px; gap:2px; padding:3px;
+  }
+  .case-reel-lane .case-reel-card .emoji{font-size:16px;}
+  .case-reel-lane .case-reel-card .name{font-size:7.5px; -webkit-line-clamp:2;}
+  .case-reel-lane .case-reel-card .price{font-size:8.5px;}
+  .case-reel-lane.done .case-reel-pointer{box-shadow:0 0 10px var(--green); background:var(--green);}
+  .case-reel-lane.done .case-reel-pointer::before{border-top-color:var(--green);}
   .case-open-row{display:flex; gap:8px; margin-top:4px;}
   .case-open-row .case-open-btn{margin-top:0;}
   .case-open-btn.x5{background:var(--panel-2); color:var(--amber); border:1px solid var(--amber-dim); flex:0 0 78px;}
@@ -1740,6 +1756,29 @@
     `;
   }
 
+  // Строит ленту карточек (случайный филлер + выигрыш в позиции CASE_REEL_WIN_INDEX + хвост)
+  // и запускает transition на нужном track-элементе так, чтобы выигрышная карточка
+  // остановилась ровно под указателем (track уже стоит с left:50%).
+  function spinCaseReelTrack(trackEl, pool, wonItem, cardW, gap, duration) {
+    const items = [];
+    for (let i = 0; i < CASE_REEL_WIN_INDEX; i++) items.push(pool[Math.floor(Math.random() * pool.length)]);
+    items.push(wonItem);
+    for (let i = 0; i < CASE_REEL_TAIL; i++) items.push(pool[Math.floor(Math.random() * pool.length)]);
+
+    trackEl.innerHTML = items.map(caseReelCardHtml).join('');
+    trackEl.style.transition = 'none';
+    trackEl.style.transform = 'translateX(0px)';
+    // eslint-disable-next-line no-unused-expressions
+    trackEl.offsetHeight; // форсируем reflow перед стартом transition
+
+    const cardFull = cardW + gap;
+    const jitter = (Math.random() - 0.5) * (cardW * 0.6);
+    const targetX = -(CASE_REEL_WIN_INDEX * cardFull + cardW / 2) + jitter;
+
+    trackEl.style.transition = `transform ${duration}ms cubic-bezier(.09,.72,.14,1)`;
+    trackEl.style.transform = `translateX(${targetX}px)`;
+  }
+
   function playCaseOpenReel(caseId, wonItem) {
     return new Promise(resolve => {
       const pool = (casesPoolById[caseId] && casesPoolById[caseId].length) ? casesPoolById[caseId] : [wonItem];
@@ -1758,30 +1797,65 @@
       document.body.appendChild(overlay);
 
       const track = overlay.querySelector('#case-reel-track');
-      const items = [];
-      for (let i = 0; i < CASE_REEL_WIN_INDEX; i++) items.push(pool[Math.floor(Math.random() * pool.length)]);
-      items.push(wonItem);
-      for (let i = 0; i < CASE_REEL_TAIL; i++) items.push(pool[Math.floor(Math.random() * pool.length)]);
-
-      track.innerHTML = items.map(caseReelCardHtml).join('');
-      track.style.transition = 'none';
-      track.style.transform = 'translateX(0px)';
-      // eslint-disable-next-line no-unused-expressions
-      track.offsetHeight; // форсируем reflow перед стартом transition
-
-      const cardFull = CASE_REEL_CARD_W + CASE_REEL_GAP;
-      const jitter = (Math.random() - 0.5) * (CASE_REEL_CARD_W * 0.6);
-      const targetX = -(CASE_REEL_WIN_INDEX * cardFull + CASE_REEL_CARD_W / 2) + jitter;
-
-      track.style.transition = 'transform 4.6s cubic-bezier(.09,.72,.14,1)';
-      track.style.transform = `translateX(${targetX}px)`;
+      const duration = 4600;
+      spinCaseReelTrack(track, pool, wonItem, CASE_REEL_CARD_W, CASE_REEL_GAP, duration);
 
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 
       setTimeout(() => {
         overlay.remove();
         resolve();
-      }, 4700);
+      }, duration + 100);
+    });
+  }
+
+  // Открытие пачкой: столько же лент, сколько кейсов открыто одновременно —
+  // каждая крутится и останавливается на своём предмете, все параллельно.
+  const CASE_REEL_MULTI_CARD_W = 60;
+  const CASE_REEL_MULTI_GAP = 7;
+
+  function playCaseOpenReelMulti(caseId, wonItems) {
+    return new Promise(resolve => {
+      const pool = (casesPoolById[caseId] && casesPoolById[caseId].length) ? casesPoolById[caseId] : wonItems;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'drop-overlay case-reel-overlay';
+      overlay.innerHTML = `
+        <div class="case-reel-wrap multi">
+          <div class="case-reel-title">Открываем ${wonItems.length} кейсов…</div>
+          <div class="case-reel-lanes" id="case-reel-lanes"></div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const lanesEl = overlay.querySelector('#case-reel-lanes');
+      lanesEl.innerHTML = wonItems.map((_, idx) => `
+        <div class="case-reel-lane" id="case-reel-lane-${idx}">
+          <div class="case-reel-viewport">
+            <div class="case-reel-pointer"></div>
+            <div class="case-reel-track" id="case-reel-track-${idx}"></div>
+          </div>
+        </div>
+      `).join('');
+
+      let maxDuration = 0;
+      wonItems.forEach((item, idx) => {
+        const laneEl = document.getElementById(`case-reel-lane-${idx}`);
+        const track = document.getElementById(`case-reel-track-${idx}`);
+        // Небольшой разброс длительности — ленты тормозят не строго синхронно,
+        // как будто крутятся независимо, но все укладываются в общий таймаут.
+        const duration = 3400 + idx * 260 + Math.floor(Math.random() * 300);
+        maxDuration = Math.max(maxDuration, duration);
+        spinCaseReelTrack(track, pool, item, CASE_REEL_MULTI_CARD_W, CASE_REEL_MULTI_GAP, duration);
+        setTimeout(() => laneEl.classList.add('done'), duration);
+      });
+
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      setTimeout(() => {
+        overlay.remove();
+        resolve();
+      }, maxDuration + 150);
     });
   }
 
@@ -1851,6 +1925,7 @@
         return;
       }
       if (count > 1) {
+        await playCaseOpenReelMulti(caseId, data.items);
         showMultiDropOverlay(data.items, data.price_paid, data.xp_gained);
       } else {
         await playCaseOpenReel(caseId, data.item);
