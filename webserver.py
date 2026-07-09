@@ -791,6 +791,119 @@ def _slots_payout(reels: list[dict], bet: int) -> tuple[int, str]:
     return 0, "none"
 
 
+async def handle_upgrade_config(request: web.Request) -> web.Response:
+    """Отдаёт настройки Апгрейда (см. handlers/upgrade.py) — сколько предметов
+    можно объединить за раз и таблицу множитель/шанс из config.UPGRADE_MULTIPLIERS,
+    отсортированную по возрастанию."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    multipliers = [
+        {"multiplier": mult, "chance": chance}
+        for mult, chance in sorted(config.UPGRADE_MULTIPLIERS.items())
+    ]
+
+    return web.json_response({
+        "max_items": config.MAX_UPGRADE_ITEMS,
+        "multipliers": multipliers,
+    })
+
+
+async def handle_upgrade_run(request: web.Request) -> web.Response:
+    """Запускает апгрейд из Web App — та же логика, что в боте
+    (handlers/upgrade.py:do_upgrade): выбранные предметы суммируются по цене,
+    с шансом из config.UPGRADE_MULTIPLIERS цена умножается на множитель и все
+    предметы объединяются в один новый, иначе всё сгорает в джекпот."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    raw_ids = payload.get("item_ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return web.json_response({"error": "invalid_item_ids"}, status=400)
+
+    try:
+        item_ids = [int(i) for i in raw_ids]
+    except (TypeError, ValueError):
+        return web.json_response({"error": "invalid_item_ids"}, status=400)
+
+    if len(set(item_ids)) != len(item_ids):
+        return web.json_response({"error": "duplicate_item_ids"}, status=400)
+    if len(item_ids) > config.MAX_UPGRADE_ITEMS:
+        return web.json_response({"error": "too_many_items"}, status=400)
+
+    try:
+        mult = float(payload.get("multiplier"))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "invalid_multiplier"}, status=400)
+    if mult == int(mult):
+        mult = int(mult)
+
+    chance = config.UPGRADE_MULTIPLIERS.get(mult)
+    if chance is None:
+        return web.json_response({"error": "invalid_multiplier"}, status=400)
+
+    items = [db.get_item_by_id(item_id, user_id) for item_id in item_ids]
+    if any(i is None for i in items):
+        return web.json_response({"error": "item_not_found"}, status=404)
+    if any(i["is_protected"] for i in items):
+        return web.json_response({"error": "item_protected"}, status=400)
+
+    total_price = sum(i["item_price"] for i in items)
+    success = random.random() < chance
+
+    if success:
+        new_price = int(total_price * mult)
+        if len(items) == 1:
+            new_name = items[0]["item_name"]
+            new_rarity = items[0]["item_rarity"]
+        else:
+            best = max(items, key=lambda i: i["item_price"])
+            new_name = f"Улучшенный набор ({len(items)} предм.)"
+            new_rarity = best["item_rarity"]
+
+        for i in items:
+            db.remove_item(i["id"], user_id)
+        new_item_id = db.add_item(user_id, new_name, new_rarity, new_price)
+        db.increment_stat(user_id, "upgrades_success")
+        xp_result = db.add_xp(user_id, config.XP_UPGRADE_SUCCESS)
+
+        return web.json_response({
+            "success": True,
+            "total_price": total_price,
+            "multiplier": mult,
+            "chance": chance,
+            "new_item": {
+                "id": new_item_id,
+                "name": new_name,
+                "rarity": new_rarity,
+                "price": new_price,
+            },
+            "level_info": xp_result,
+        })
+    else:
+        for i in items:
+            db.remove_item(i["id"], user_id)
+        db.increment_stat(user_id, "upgrades_failed")
+        db.add_to_jackpot(total_price)  # сгоревшие монеты уходят в джекпот
+
+        return web.json_response({
+            "success": False,
+            "total_price": total_price,
+            "multiplier": mult,
+            "chance": chance,
+        })
+
+
 async def handle_slots_spin(request: web.Request) -> web.Response:
     user_data = _authenticate(request)
     if user_data is None:
@@ -879,6 +992,8 @@ def create_app() -> web.Application:
     app.router.add_get("/api/top", handle_top)
     app.router.add_get("/api/slots/config", handle_slots_config)
     app.router.add_post("/api/slots/spin", handle_slots_spin)
+    app.router.add_get("/api/upgrade/config", handle_upgrade_config)
+    app.router.add_post("/api/upgrade/run", handle_upgrade_run)
     app.router.add_get("/api/battle/config", handle_battle_config)
     app.router.add_post("/api/battle/finish", handle_battle_finish)
     app.router.add_get("/api/crash/state", handle_crash_state)
