@@ -1094,7 +1094,8 @@
 
   async function loadSlotsConfig() {
     if (slotsCfg) return slotsCfg;
-    slotsCfg = await apiGet('/api/slots/config');
+    const data = await apiGet('/api/slots/config');
+    slotsCfg = { betOptions: data.bet_options, symbols: data.symbols };
     return slotsCfg;
   }
 
