@@ -17,6 +17,7 @@ import hmac
 import json
 import logging
 import os
+import random
 import time
 from urllib.parse import parse_qsl
 
@@ -481,6 +482,35 @@ async def handle_inventory_sell(request: web.Request) -> web.Response:
     return web.json_response({"sold_for": price, "balance": db.get_balance(user_id)})
 
 
+async def handle_inventory_sell_all(request: web.Request) -> web.Response:
+    """Продаёт весь незащищённый инвентарь разом — та же логика (и та же
+    db.remove_all_items), что использует кнопка "🗑 Продать всё" в боте
+    (handlers/inventory.py:sell_all)."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    items = db.get_inventory(user_id)
+    sellable = [i for i in items if not i["is_protected"]]
+
+    if not sellable:
+        return web.json_response({"error": "nothing_to_sell"}, status=400)
+
+    total_price = sum(max(1, int(i["item_price"] * config.SELL_PERCENT)) for i in sellable)
+    count = len(sellable)
+
+    db.remove_all_items(user_id)  # защищённые предметы не удаляются
+    db.add_balance(user_id, total_price)
+
+    return web.json_response({
+        "sold_count": count,
+        "sold_for": total_price,
+        "protected_remaining": len(items) - count,
+        "balance": db.get_balance(user_id),
+    })
+
+
 async def handle_top(request: web.Request) -> web.Response:
     """Три рейтинга (монеты / уровень / самый дорогой дроп), читают ту же
     общую базу, что и раздел «🏆 Топ» в боте (handlers/top.py)."""
@@ -731,6 +761,93 @@ async def handle_crash_cashout(request: web.Request) -> web.Response:
     })
 
 
+# ---------- Слоты (Web App, Этап 3) ----------
+#
+# Честная механика на сервере: каждый из 3 барабанов крутится независимо,
+# символ выбирается взвешенным случайным выбором из config.SLOTS_SYMBOLS
+# (чем выше "weight", тем чаще символ выпадает). Клиент получает готовый
+# результат и только красиво его анимирует — подделать исход нельзя,
+# т.к. деньги списываются/начисляются на сервере ДО ответа клиенту.
+_SLOTS_WEIGHTS = [s["weight"] for s in config.SLOTS_SYMBOLS]
+
+
+def _spin_reels() -> list[dict]:
+    return random.choices(config.SLOTS_SYMBOLS, weights=_SLOTS_WEIGHTS, k=3)
+
+
+def _slots_payout(reels: list[dict], bet: int) -> tuple[int, str]:
+    """Возвращает (выигрыш_в_монетах, тип_комбинации)."""
+    ids = [r["id"] for r in reels]
+    if ids[0] == ids[1] == ids[2]:
+        symbol = reels[0]
+        return int(bet * symbol["payout"]), "triple"
+
+    # Ищем совпадение ровно двух из трёх барабанов (пара) — считаем по
+    # символу, который встретился дважды.
+    for sym in reels:
+        if ids.count(sym["id"]) == 2:
+            return int(bet * sym["pair_payout"]), "pair"
+
+    return 0, "none"
+
+
+async def handle_slots_spin(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    try:
+        bet = int(payload.get("bet"))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "invalid_bet"}, status=400)
+
+    if bet not in config.SLOTS_BET_OPTIONS:
+        return web.json_response({"error": "invalid_bet"}, status=400)
+
+    balance = db.get_balance(user_id)
+    if balance < bet:
+        return web.json_response({"error": "insufficient_balance"}, status=400)
+
+    db.add_balance(user_id, -bet)
+
+    reels = _spin_reels()
+    payout, combo = _slots_payout(reels, bet)
+
+    xp_amount = config.XP_SLOTS_SPIN + (config.XP_SLOTS_WIN if payout > 0 else 0)
+    if payout > 0:
+        db.add_balance(user_id, payout)
+    xp_result = db.add_xp(user_id, xp_amount)
+
+    return web.json_response({
+        "reels": [{"id": r["id"], "icon": r["icon"]} for r in reels],
+        "combo": combo,
+        "bet": bet,
+        "payout": payout,
+        "net": payout - bet,
+        "balance": db.get_balance(user_id),
+        "level_info": xp_result,
+    })
+
+
+async def handle_slots_config(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    return web.json_response({
+        "bet_options": config.SLOTS_BET_OPTIONS,
+        "symbols": [{"id": s["id"], "icon": s["icon"]} for s in config.SLOTS_SYMBOLS],
+    })
+
+
 async def handle_index(request: web.Request) -> web.Response:
     # aiohttp's add_static НЕ отдаёт index.html автоматически на "/" —
     # он трактует "/" как запрос к самой папке и при show_index=False
@@ -749,7 +866,10 @@ def create_app() -> web.Application:
     app.router.add_post("/api/shop/buy", handle_shop_buy)
     app.router.add_post("/api/inventory/protect", handle_inventory_protect)
     app.router.add_post("/api/inventory/sell", handle_inventory_sell)
+    app.router.add_post("/api/inventory/sell_all", handle_inventory_sell_all)
     app.router.add_get("/api/top", handle_top)
+    app.router.add_get("/api/slots/config", handle_slots_config)
+    app.router.add_post("/api/slots/spin", handle_slots_spin)
     app.router.add_get("/api/battle/config", handle_battle_config)
     app.router.add_post("/api/battle/finish", handle_battle_finish)
     app.router.add_get("/api/crash/state", handle_crash_state)
