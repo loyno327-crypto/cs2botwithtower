@@ -49,22 +49,6 @@
     background:linear-gradient(180deg, var(--bg-1), transparent);
     position:sticky; top:0; z-index:9;
   }
-  .hud-top{display:flex; align-items:center; justify-content:space-between;}
-  .brand{
-    font-family:var(--mono);
-    font-size:11px;
-    letter-spacing:3px;
-    color:var(--amber-dim);
-    text-transform:uppercase;
-  }
-  .brand b{color:var(--amber);}
-  .status-dot{
-    width:6px; height:6px; border-radius:50%; background:var(--green);
-    box-shadow:0 0 6px var(--green);
-    display:inline-block; margin-right:6px;
-    animation:pulse 2s infinite;
-  }
-  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.4;}}
 
   .profile-card{
     margin-top:12px;
@@ -151,16 +135,6 @@
   .stat-card .val{font-family:var(--mono); font-size:20px; font-weight:600; color:var(--amber);}
   .stat-card .lbl{font-size:11px; color:var(--text-dim); margin-top:2px; text-transform:uppercase; letter-spacing:.5px;}
 
-  .roadmap-panel{
-    background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:14px;
-    font-size:13.5px; line-height:1.55; color:var(--text-dim);
-  }
-  .roadmap-panel b{color:var(--text);}
-  .roadmap-panel .tag{
-    display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:1.5px;
-    color:var(--amber); border:1px solid var(--amber-dim); border-radius:3px; padding:2px 6px;
-    margin-bottom:8px; text-transform:uppercase;
-  }
 
   /* ---- Быстрый доступ на Главной (переход в разделы) ---- */
   .quick-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
@@ -344,6 +318,22 @@
     font-size:13px; color:var(--text); line-height:1;
     transition:left 1.15s cubic-bezier(.17,.67,.2,1.15);
   }
+  .upgrade-chance-roll{
+    position:absolute; top:-38px; left:0%; transform:translateX(-50%);
+    font-family:var(--mono); font-size:11px; font-weight:700; color:var(--text);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:4px;
+    padding:2px 7px; white-space:nowrap; opacity:0; pointer-events:none;
+    transition:left 1.15s cubic-bezier(.17,.67,.2,1.15), opacity .2s ease;
+  }
+  .upgrade-chance-roll::after{
+    content:''; position:absolute; left:50%; bottom:-4px; transform:translateX(-50%);
+    border:4px solid transparent; border-top-color:var(--line);
+  }
+  .upgrade-chance-roll.show{opacity:1;}
+  .upgrade-chance-roll.win{color:var(--green); border-color:var(--green);}
+  .upgrade-chance-roll.win::after{border-top-color:var(--green);}
+  .upgrade-chance-roll.lose{color:var(--red); border-color:var(--red);}
+  .upgrade-chance-roll.lose::after{border-top-color:var(--red);}
   .upgrade-chance-labels{
     display:flex; justify-content:space-between; margin-top:6px;
     font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
@@ -397,6 +387,11 @@
   .upgrade-mult-btn .chance{display:block; font-size:10.5px; color:var(--text-dim); margin-top:3px; font-weight:500;}
   .upgrade-mult-btn:active{background:var(--panel-2); border-color:var(--amber-dim);}
   .upgrade-mult-btn:disabled{opacity:.4;}
+  .upgrade-mult-btn.selected{
+    border-color:var(--amber); background:var(--panel-2);
+    box-shadow:0 0 0 1px var(--amber), 0 0 14px rgba(34,211,238,.25);
+  }
+  .upgrade-mult-btn.selected .chance{color:var(--amber);}
   .upgrade-go-btn{
     width:100%; padding:15px; border:none; border-radius:6px; cursor:pointer;
     background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
@@ -414,20 +409,21 @@
     padding:4px 12px; margin-bottom:12px;
   }
   .paytable-head{
-    display:flex; justify-content:space-between; align-items:center;
+    display:grid; grid-template-columns:1fr 104px; align-items:center;
     font-family:var(--mono); font-size:10px; letter-spacing:1.5px; color:var(--text-dim);
     text-transform:uppercase; padding:9px 0; border-bottom:1px solid var(--line);
   }
-  .paytable-head span:last-child{display:flex; gap:16px;}
+  .paytable-head span:last-child{display:grid; grid-template-columns:1fr 1fr; text-align:center;}
   .paytable-row{
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    display:grid; grid-template-columns:1fr 104px; align-items:center; gap:10px;
     padding:8px 0; border-bottom:1px solid var(--line);
   }
   .paytable-row:last-child{border-bottom:none;}
   .paytable-left{display:flex; align-items:center; gap:10px; min-width:0;}
   .paytable-icon{font-size:21px; width:26px; text-align:center; flex-shrink:0;}
-  .paytable-name{font-size:12.5px; font-weight:600; color:var(--text); white-space:nowrap;}
-  .paytable-mults{display:flex; gap:16px; font-family:var(--mono); font-size:12px; color:var(--text-dim); flex-shrink:0;}
+  .paytable-name{font-size:12.5px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
+  .paytable-mults{display:grid; grid-template-columns:1fr 1fr; font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+  .paytable-mults span{text-align:center;}
   .paytable-mults b{color:var(--amber); font-weight:600;}
   .paytable-mults .mult-lbl{font-size:9px; display:block; letter-spacing:.5px; color:var(--text-dim); text-align:center;}
 
@@ -496,6 +492,51 @@
   .drop-multi-item .price{font-family:var(--mono); font-size:10.5px; color:var(--amber); margin-top:2px;}
   .drop-multi-total{font-family:var(--mono); font-size:13px; color:var(--text-dim); margin-bottom:14px;}
   .drop-multi-total b{color:var(--amber);}
+
+  /* ---- Кейсы: прокрутка ленты, как в CS2 ---- */
+  .case-reel-overlay{background:rgba(6,7,4,0.9);}
+  .case-reel-wrap{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px 0; width:100%; max-width:360px;
+  }
+  .case-reel-title{
+    font-family:var(--mono); font-size:11px; letter-spacing:1.5px; color:var(--text-dim);
+    text-transform:uppercase; text-align:center; margin-bottom:12px;
+  }
+  .case-reel-viewport{
+    position:relative; height:104px; overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+    mask-image:linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+  }
+  .case-reel-pointer{
+    position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--amber);
+    transform:translateX(-50%); z-index:2; box-shadow:0 0 8px var(--amber);
+  }
+  .case-reel-pointer::before{
+    content:''; position:absolute; top:-1px; left:50%; transform:translateX(-50%);
+    border:6px solid transparent; border-top:8px solid var(--amber);
+  }
+  .case-reel-track{
+    position:absolute; top:0; left:50%; display:flex; align-items:center; gap:10px; height:100%;
+    will-change:transform;
+  }
+  .case-reel-card{
+    flex:0 0 84px; width:84px; height:88px; border-radius:6px;
+    background:var(--panel-2); border:1px solid var(--line); border-top:3px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    text-align:center; padding:4px;
+  }
+  .case-reel-card.rarity-militari{border-top-color:var(--blue);}
+  .case-reel-card.rarity-zapreshennoe{border-top-color:var(--purple);}
+  .case-reel-card.rarity-zasekrechennoe{border-top-color:var(--pink);}
+  .case-reel-card.rarity-taynoe{border-top-color:var(--red);}
+  .case-reel-card.rarity-redkiy{border-top-color:var(--amber);}
+  .case-reel-card .emoji{font-size:22px; line-height:1;}
+  .case-reel-card .name{
+    font-size:9px; color:var(--text-dim); line-height:1.15; overflow:hidden;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+  .case-reel-card .price{font-family:var(--mono); font-size:10px; color:var(--amber); font-weight:600;}
   .case-open-row{display:flex; gap:8px; margin-top:4px;}
   .case-open-row .case-open-btn{margin-top:0;}
   .case-open-btn.x5{background:var(--panel-2); color:var(--amber); border:1px solid var(--amber-dim); flex:0 0 78px;}
@@ -619,11 +660,6 @@
 <body>
 
 <header class="hud">
-  <div class="hud-top">
-    <div class="brand"><span class="status-dot"></span><b>WEB APP</b> // ONLINE</div>
-    <div class="brand" id="stage-tag">STAGE 3</div>
-  </div>
-
   <div class="profile-card" id="profile-card">
     <div class="loading-line" id="loading-line" style="flex:1;">подключение к серверу…</div>
   </div>
@@ -646,17 +682,6 @@
       <div class="quick-card" data-goto="inventory"><span class="icon">🎒</span><div class="name">Инвентарь</div></div>
     </div>
 
-    <div class="section-title spaced">Что дальше</div>
-    <div class="roadmap-panel">
-      <span class="tag">Этап 3</span><br>
-      Готово: <b>Crash</b>, <b>Слоты</b> и <b>Апгрейд</b> с реальным сервером
-      и живой анимацией, <b>Кейсы</b> открываются прямо в Web App, <b>Магазин</b>
-      за монеты, защита и массовая продажа предметов в <b>Инвентаре</b>, три
-      живых рейтинга в <b>Топе</b> — все данные общие с ботом.<br><br>
-      Дальше по плану: покупка и открытие кейсов из <b>Магазина</b> одним
-      действием, экономика башен (стоимость, редкость, апгрейды) в
-      PvE-режиме — Этапы 5-7.
-    </div>
   </div>
 
   <!-- ИГРЫ -->
@@ -726,6 +751,7 @@
       <div class="upgrade-stage" id="upgrade-stage">
         <div class="upgrade-chance-bar" id="upgrade-chance-bar">
           <div class="upgrade-chance-fill" id="upgrade-chance-fill"></div>
+          <div class="upgrade-chance-roll" id="upgrade-chance-roll"></div>
           <div class="upgrade-chance-marker" id="upgrade-chance-marker">▲</div>
         </div>
         <div class="upgrade-chance-labels">
@@ -1430,10 +1456,12 @@
   const upgradePanelEl = document.getElementById('upgrade-panel');
   const upgradeChanceFillEl = document.getElementById('upgrade-chance-fill');
   const upgradeChanceMarkerEl = document.getElementById('upgrade-chance-marker');
+  const upgradeChanceRollEl = document.getElementById('upgrade-chance-roll');
 
   let upgradeCfg = null; // { max_items, multipliers: [{multiplier, chance}] }
   let upgradeItems = []; // незащищённый инвентарь, свежий список
   let upgradePicked = []; // id выбранных предметов, в порядке выбора
+  let upgradeSelectedMult = null; // выбранный, но ещё не запущенный процент
   let upgradeRunning = false;
   let upgradeTimeoutId = null;
 
@@ -1461,6 +1489,9 @@
     upgradeChanceFillEl.style.width = '0%';
     upgradeChanceMarkerEl.style.transition = 'none';
     upgradeChanceMarkerEl.style.left = '0%';
+    upgradeChanceRollEl.classList.remove('show', 'win', 'lose');
+    upgradeChanceRollEl.style.transition = 'none';
+    upgradeChanceRollEl.style.left = '0%';
     upgradeResultEl.className = 'upgrade-result';
   }
 
@@ -1526,28 +1557,47 @@
     const items = upgradeSelectedItems();
     if (items.length === 0) { renderUpgradePickPanel(); return; }
     const total = upgradeTotalPrice();
+    upgradeSelectedMult = null;
 
     renderUpgradeStageIdle();
     upgradeErrorEl.textContent = '';
-    upgradeResultEl.innerHTML = `Выбери множитель — суммарная цена <b>${fmt(total)}</b> монет`;
+    upgradeResultEl.innerHTML = `Выбери процент — суммарная цена <b>${fmt(total)}</b> монет`;
 
     const names = items.map(i => escapeHtml(i.name)).join(', ');
+    renderUpgradeMultPanel(items, total, names);
+  }
+
+  // Шаг 1: выбор процента (шанса) — только помечает кнопку выбранной.
+  // Сам апгрейд НЕ запускается сразу, только по отдельной кнопке "Запустить".
+  function renderUpgradeMultPanel(items, total, names) {
     const multButtons = upgradeCfg.multipliers.map(m => `
-      <button class="upgrade-mult-btn" data-mult="${m.multiplier}">
+      <button class="upgrade-mult-btn ${upgradeSelectedMult === m.multiplier ? 'selected' : ''}" data-mult="${m.multiplier}">
         x${m.multiplier}
         <span class="chance">шанс ${Math.round(m.chance * 100)}% · итог ${fmt(Math.floor(total * m.multiplier))}</span>
       </button>
     `).join('');
 
+    const canStart = upgradeSelectedMult !== null;
     upgradePanelEl.innerHTML = `
       <div class="upgrade-summary"><span>Предметы: <b>${names}</b></span></div>
       <div class="upgrade-mult-grid">${multButtons}</div>
+      <button class="upgrade-go-btn" id="upgrade-start-btn" ${canStart ? '' : 'disabled'}>
+        ${canStart ? `🛠 Запустить апгрейд x${upgradeSelectedMult}` : 'Сначала выбери процент'}
+      </button>
       <button class="upgrade-secondary-btn" id="upgrade-back-to-pick-btn">‹ Изменить выбор</button>
     `;
 
     upgradePanelEl.querySelectorAll('.upgrade-mult-btn').forEach(btn => {
-      btn.addEventListener('click', () => runUpgrade(Number(btn.dataset.mult)));
+      btn.addEventListener('click', () => {
+        upgradeSelectedMult = Number(btn.dataset.mult);
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        renderUpgradeMultPanel(items, total, names);
+      });
     });
+    const startBtn = document.getElementById('upgrade-start-btn');
+    if (startBtn && canStart) {
+      startBtn.addEventListener('click', () => runUpgrade(upgradeSelectedMult));
+    }
     document.getElementById('upgrade-back-to-pick-btn').addEventListener('click', renderUpgradePickPanel);
   }
 
@@ -1601,8 +1651,16 @@
       const targetPct = data.success
         ? chancePct * 0.1 + Math.random() * chancePct * 0.8
         : chancePct + failZoneWidth * 0.1 + Math.random() * failZoneWidth * 0.8;
+      const clampedPct = Math.max(1, Math.min(99, targetPct));
       upgradeChanceMarkerEl.style.transition = 'left 1.15s cubic-bezier(.17,.67,.2,1.15)';
-      upgradeChanceMarkerEl.style.left = `${Math.max(1, Math.min(99, targetPct))}%`;
+      upgradeChanceMarkerEl.style.left = `${clampedPct}%`;
+
+      // Показываем на баре, какой именно процент "выпал" в этом раунде.
+      upgradeChanceRollEl.textContent = `${clampedPct.toFixed(1)}%`;
+      upgradeChanceRollEl.classList.remove('win', 'lose');
+      upgradeChanceRollEl.style.transition = 'left 1.15s cubic-bezier(.17,.67,.2,1.15), opacity .2s ease';
+      upgradeChanceRollEl.style.left = `${clampedPct}%`;
+      upgradeChanceRollEl.classList.add('show', data.success ? 'win' : 'lose');
 
       await new Promise(resolve => { upgradeTimeoutId = setTimeout(resolve, 1200); });
 
@@ -1638,6 +1696,7 @@
     stopUpgradeAnimation();
     upgradeRunning = false;
     upgradePicked = [];
+    upgradeSelectedMult = null;
     upgradeErrorEl.textContent = '';
     upgradeResultEl.textContent = 'подключение к серверу…';
     upgradePanelEl.innerHTML = '';
@@ -1654,10 +1713,77 @@
 
   // ---------- Кейсы ----------
   let casesLoaded = false;
+  const casesPoolById = {}; // caseId -> список предметов кейса (без весов), для ленты прокрутки
   const RARITY_EMOJI = {
     'Милитари': '🔵', 'Запрещённое': '🟪', 'Засекреченное': '🌸',
     'Тайное': '🔴', 'Редкий спецпредмет': '🟡',
   };
+
+  // Прокрутка ленты предметов, как в CS2: собираем длинную полосу карточек
+  // (случайные предметы этого кейса + реальный выигрыш от сервера в конце),
+  // затем анимируем transform так, чтобы выигрышная карточка точно
+  // остановилась под указателем в центре окна. Исход уже решён на сервере
+  // (data.item пришёл из /api/cases/open) — тут только красивая визуализация.
+  const CASE_REEL_CARD_W = 84;
+  const CASE_REEL_GAP = 10;
+  const CASE_REEL_WIN_INDEX = 36;
+  const CASE_REEL_TAIL = 6;
+
+  function caseReelCardHtml(item) {
+    const emoji = RARITY_EMOJI[item.rarity] || '◽';
+    return `
+      <div class="case-reel-card ${rarityClass(item.rarity)}">
+        <div class="emoji">${emoji}</div>
+        <div class="name">${escapeHtml(item.name)}</div>
+        <div class="price">${fmt(item.price)}</div>
+      </div>
+    `;
+  }
+
+  function playCaseOpenReel(caseId, wonItem) {
+    return new Promise(resolve => {
+      const pool = (casesPoolById[caseId] && casesPoolById[caseId].length) ? casesPoolById[caseId] : [wonItem];
+
+      const overlay = document.createElement('div');
+      overlay.className = 'drop-overlay case-reel-overlay';
+      overlay.innerHTML = `
+        <div class="case-reel-wrap">
+          <div class="case-reel-title">Открываем кейс…</div>
+          <div class="case-reel-viewport">
+            <div class="case-reel-pointer"></div>
+            <div class="case-reel-track" id="case-reel-track"></div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const track = overlay.querySelector('#case-reel-track');
+      const items = [];
+      for (let i = 0; i < CASE_REEL_WIN_INDEX; i++) items.push(pool[Math.floor(Math.random() * pool.length)]);
+      items.push(wonItem);
+      for (let i = 0; i < CASE_REEL_TAIL; i++) items.push(pool[Math.floor(Math.random() * pool.length)]);
+
+      track.innerHTML = items.map(caseReelCardHtml).join('');
+      track.style.transition = 'none';
+      track.style.transform = 'translateX(0px)';
+      // eslint-disable-next-line no-unused-expressions
+      track.offsetHeight; // форсируем reflow перед стартом transition
+
+      const cardFull = CASE_REEL_CARD_W + CASE_REEL_GAP;
+      const jitter = (Math.random() - 0.5) * (CASE_REEL_CARD_W * 0.6);
+      const targetX = -(CASE_REEL_WIN_INDEX * cardFull + CASE_REEL_CARD_W / 2) + jitter;
+
+      track.style.transition = 'transform 4.6s cubic-bezier(.09,.72,.14,1)';
+      track.style.transform = `translateX(${targetX}px)`;
+
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      setTimeout(() => {
+        overlay.remove();
+        resolve();
+      }, 4700);
+    });
+  }
 
   function showDropOverlay(item, extraNote) {
     const emoji = RARITY_EMOJI[item.rarity] || '◽';
@@ -1727,6 +1853,7 @@
       if (count > 1) {
         showMultiDropOverlay(data.items, data.price_paid, data.xp_gained);
       } else {
+        await playCaseOpenReel(caseId, data.item);
         showDropOverlay(data.item, `+${data.xp_gained} XP · заплачено ${fmt(data.price_paid)} монет`);
       }
       loadProfile();
@@ -1746,6 +1873,7 @@
       const data = await apiGet('/api/shop/cases');
       const bulkCount = data.bulk_open_count || 5;
       const level = meData?.level ?? 1;
+      data.cases.forEach(c => { casesPoolById[c.id] = c.items || c.sample_items || []; });
       const cardsHtml = data.cases.map(c => {
         const locked = level < c.min_level;
         return `

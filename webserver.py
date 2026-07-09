@@ -302,7 +302,9 @@ async def handle_shop_cases(request: web.Request) -> web.Response:
 
     cases = _load_cases()
     # Наружу отдаём укороченную витрину: без весов дропа (это внутренняя
-    # механика шанса) и не более 4 примеров предметов на кейс.
+    # механика шанса). "sample_items" — 4 примера для карточки кейса,
+    # "items" — полный список предметов (тоже без весов) для визуальной
+    # прокрутки при открытии кейса в Web App.
     preview = []
     for case in cases:
         items_sorted = sorted(case["items"], key=lambda i: i["price"], reverse=True)
@@ -314,6 +316,10 @@ async def handle_shop_cases(request: web.Request) -> web.Response:
             "sample_items": [
                 {"name": i["name"], "rarity": i["rarity"], "price": i["price"]}
                 for i in items_sorted[:4]
+            ],
+            "items": [
+                {"name": i["name"], "rarity": i["rarity"], "price": i["price"]}
+                for i in case["items"]
             ],
         })
 
