@@ -3,10 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Ops Defence</title>
+<title>Web App</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root{
+    /* Палитра из Этапа 1 сохранена как есть — полный единый рестайлинг
+       под "тёмный игровой стиль" запланирован отдельным Этапом 3 в твоём
+       плане, здесь трогаем только структуру. */
     --bg-0:#0b0d0a;
     --bg-1:#12150f;
     --panel:#171b13;
@@ -99,7 +102,7 @@
   }
   .xp-fill{height:100%; background:linear-gradient(90deg, var(--amber-dim), var(--amber)); width:0%; transition:width .6s ease;}
 
-  main{flex:1; padding:16px; padding-bottom:90px;}
+  main{flex:1; padding:16px; padding-bottom:96px;}
 
   .view{display:none;}
   .view.active{display:block; animation:fadein .25s ease;}
@@ -117,6 +120,10 @@
     font-family:var(--mono); font-size:12px; line-height:1.6;
   }
   .placeholder-panel .big{font-size:28px; margin-bottom:8px; display:block;}
+  .placeholder-panel .stage-note{
+    display:inline-block; margin-top:10px; font-size:10px; letter-spacing:1px;
+    color:var(--amber); border:1px solid var(--amber-dim); border-radius:3px; padding:3px 8px;
+  }
 
   .loading-line{
     font-family:var(--mono); font-size:11px; color:var(--text-dim); text-align:center; padding:40px 0;
@@ -148,31 +155,38 @@
     margin-bottom:8px; text-transform:uppercase;
   }
 
-  /* ---- Играть: выбор стороны ---- */
-  .side-grid{display:flex; gap:10px;}
-  .side-card{
-    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:6px;
-    padding:20px 12px; text-align:center; cursor:pointer; transition:.15s;
+  /* ---- Быстрый доступ на Главной (переход в разделы) ---- */
+  .quick-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .quick-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:14px 10px; text-align:center; cursor:pointer; transition:.15s;
   }
-  .side-card .icon{font-size:30px; display:block; margin-bottom:6px;}
-  .side-card .name{font-weight:600; font-size:16px;}
-  .side-card .desc{font-size:11px; color:var(--text-dim); margin-top:4px; line-height:1.4;}
-  .side-card.t{border-top:3px solid var(--red);}
-  .side-card.ct{border-top:3px solid var(--blue);}
-  .side-card.selected.t{background:rgba(193,70,47,0.12); border-color:var(--red);}
-  .side-card.selected.ct{background:rgba(74,144,217,0.12); border-color:var(--blue);}
+  .quick-card:active{background:var(--panel-2);}
+  .quick-card .icon{font-size:22px; display:block; margin-bottom:4px;}
+  .quick-card .name{font-size:13px; font-weight:600;}
 
-  .play-note{
-    margin-top:12px; background:var(--panel); border:1px solid var(--line); border-radius:4px;
-    padding:12px 14px; font-family:var(--mono); font-size:11.5px; color:var(--text-dim); line-height:1.6;
+  /* ---- Игры: список разделов ---- */
+  .game-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:16px; margin-bottom:10px; display:flex; align-items:center; gap:14px;
+    cursor:pointer; transition:.15s; border-left:3px solid var(--line);
   }
-  .play-note b{color:var(--amber);}
-  .btn-primary{
-    margin-top:14px; width:100%; padding:13px; border:none; border-radius:4px;
-    background:var(--amber-dim); color:var(--bg-0); font-family:var(--sans); font-weight:700;
-    font-size:14px; letter-spacing:.5px; text-transform:uppercase; cursor:pointer; opacity:.55;
+  .game-card:active{background:var(--panel-2);}
+  .game-card.crash{border-left-color:var(--red);}
+  .game-card.upgrade{border-left-color:var(--purple);}
+  .game-card.slots{border-left-color:var(--amber);}
+  .game-card .icon{font-size:28px; flex-shrink:0;}
+  .game-card .info{flex:1; min-width:0;}
+  .game-card .name{font-size:16px; font-weight:600;}
+  .game-card .desc{font-size:12px; color:var(--text-dim); margin-top:2px; line-height:1.4;}
+  .game-card .arrow{font-family:var(--mono); color:var(--text-dim); font-size:16px;}
+
+  .subview-back{
+    display:inline-flex; align-items:center; gap:6px; background:none; border:none;
+    color:var(--text-dim); font-family:var(--sans); font-size:13px; font-weight:600;
+    padding:6px 0 14px; cursor:pointer;
   }
-  .btn-primary.ready{background:var(--amber); opacity:1;}
+  .subview-back:active{color:var(--amber);}
 
   /* ---- Магазин: кейсы ---- */
   .case-card{
@@ -207,7 +221,13 @@
   .item-row.rarity-redkiy{border-left-color:var(--amber);}
   .item-name{font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .item-rarity{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px;}
+  .item-right{display:flex; align-items:center; gap:10px; flex-shrink:0;}
   .item-price{font-family:var(--mono); font-size:13px; color:var(--amber); white-space:nowrap;}
+  .lock-btn{
+    width:26px; height:26px; border-radius:4px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--text-dim); font-size:12px; display:flex; align-items:center; justify-content:center;
+    opacity:.45; flex-shrink:0;
+  }
   .inv-summary{
     display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px;
     color:var(--text-dim); margin-bottom:10px; padding:0 2px;
@@ -231,107 +251,52 @@
   .best-item-panel .name{font-size:15px; font-weight:600; margin-top:4px;}
   .best-item-panel .price{font-family:var(--mono); color:var(--amber); font-size:13px; margin-top:2px;}
 
+  /* ---- Топ ---- */
+  .top-switch{
+    display:flex; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:3px; gap:3px; margin-bottom:12px;
+  }
+  .top-switch button{
+    flex:1; padding:9px 4px; border:none; border-radius:4px; background:none;
+    color:var(--text-dim); font-family:var(--sans); font-size:11.5px; font-weight:600;
+    cursor:pointer; text-align:center;
+  }
+  .top-switch button.active{background:var(--amber-dim); color:var(--bg-0);}
+  .top-row{
+    display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line);
+    border-radius:4px; padding:10px 12px; margin-bottom:6px;
+  }
+  .top-rank{
+    font-family:var(--mono); font-weight:700; font-size:13px; color:var(--text-dim);
+    width:22px; text-align:center; flex-shrink:0;
+  }
+  .top-row:nth-child(1) .top-rank{color:var(--amber);}
+  .top-name{flex:1; font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .top-val{font-family:var(--mono); font-size:13px; color:var(--amber); flex-shrink:0;}
+
   nav.tabbar{
     position:fixed; left:0; right:0; bottom:0;
     background:var(--bg-1); border-top:1px solid var(--line);
-    display:flex; padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+    display:flex; padding:5px 2px calc(5px + env(safe-area-inset-bottom));
     z-index:10;
   }
   .tab{
-    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
-    padding:6px 2px; border:none; background:none; color:var(--text-dim);
-    font-family:var(--sans); font-size:10.5px; font-weight:600; letter-spacing:.3px;
-    text-transform:uppercase; cursor:pointer;
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:2px;
+    padding:5px 1px; border:none; background:none; color:var(--text-dim);
+    font-family:var(--sans); font-size:8.5px; font-weight:600; letter-spacing:0;
+    text-transform:uppercase; cursor:pointer; line-height:1.1; text-align:center;
   }
-  .tab .icon{font-size:18px; line-height:1;}
+  .tab .icon{font-size:17px; line-height:1;}
   .tab.active{color:var(--amber);}
   .tab.active .icon{filter:drop-shadow(0 0 4px rgba(224,167,46,.5));}
-
-  /* ---- Играть: экран боя ---- */
-  #play-select.hidden, #play-battle.hidden, #play-result.hidden{display:none;}
-
-  .battle-hud{
-    display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;
-  }
-  .hud-stat{
-    flex:1; min-width:72px; background:var(--panel); border:1px solid var(--line); border-radius:4px;
-    padding:8px 10px;
-  }
-  .hud-stat .lbl{font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase;}
-  .hud-stat .val{font-family:var(--mono); font-size:16px; font-weight:600; color:var(--amber); margin-top:2px;}
-
-  /* ---- Kill Feed (Этап 4) ---- */
-  #kill-feed{
-    position:absolute; top:6px; right:6px; z-index:5;
-    display:flex; flex-direction:column; align-items:flex-end; gap:3px;
-    pointer-events:none; max-width:78%;
-  }
-  .kf-row{
-    display:flex; align-items:center; gap:5px;
-    background:rgba(11,13,10,0.72); border:1px solid var(--line); border-radius:3px;
-    padding:3px 7px; font-family:var(--mono); font-size:10.5px; color:var(--text);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    animation:kf-in .18s ease;
-  }
-  .kf-shooter{color:var(--amber-dim);}
-  .kf-weapon{filter:grayscale(0.1);}
-  .kf-headshot{color:var(--red); font-weight:700; letter-spacing:.5px;}
-  .kf-target{color:var(--text); font-weight:600;}
-  .kf-row.kf-fade{animation:kf-out .5s ease forwards;}
-  @keyframes kf-in{from{opacity:0; transform:translateX(8px);} to{opacity:1; transform:translateX(0);}}
-  @keyframes kf-out{from{opacity:1;} to{opacity:0; transform:translateX(8px);}}
-
-  .point-hp-wrap{
-    background:var(--panel); border:1px solid var(--line); border-radius:4px;
-    padding:8px 10px; margin-bottom:8px;
-  }
-  .point-hp-wrap .lbl{font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; margin-bottom:5px;}
-  .hp-track{height:8px; background:var(--line); border-radius:4px; overflow:hidden;}
-  .hp-fill{height:100%; background:linear-gradient(90deg, var(--red), var(--amber)); width:100%; transition:width .25s ease;}
-
-  .battle-canvas-wrap{
-    background:#0e1c10; border:1px solid var(--line); border-radius:6px; overflow:hidden;
-    position:relative; line-height:0;
-  }
-  #battle-canvas{width:100%; height:auto; display:block; touch-action:manipulation;}
-
-  .build-hint{
-    font-family:var(--mono); font-size:10.5px; color:var(--text-dim); text-align:center;
-    margin-top:8px; line-height:1.5;
-  }
-  .build-hint b{color:var(--amber);}
-
-  .quit-btn{
-    margin-top:12px; width:100%; padding:11px; border-radius:4px; cursor:pointer;
-    background:none; border:1px solid var(--line); color:var(--text-dim);
-    font-family:var(--sans); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.5px;
-  }
-
-  .result-card{
-    background:var(--panel); border:1px solid var(--line); border-radius:6px;
-    padding:24px 18px; text-align:center; margin-top:6px;
-  }
-  .result-title{font-size:24px; font-weight:700; margin-bottom:4px;}
-  .result-title.win{color:var(--green);}
-  .result-title.lose{color:var(--red);}
-  .result-sub{font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:16px;}
-  .result-stats{
-    display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; text-align:left;
-  }
-  .result-stats .stat-card{border-top-color:var(--amber);}
-  .result-btn{
-    width:100%; padding:13px; border:none; border-radius:4px; cursor:pointer;
-    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
-    font-size:14px; letter-spacing:.5px; text-transform:uppercase;
-  }
 </style>
 </head>
 <body>
 
 <header class="hud">
   <div class="hud-top">
-    <div class="brand"><span class="status-dot"></span><b>OPS</b> DEFENCE // WEB APP</div>
-    <div class="brand" id="stage-tag">STAGE 4</div>
+    <div class="brand"><span class="status-dot"></span><b>WEB APP</b> // ONLINE</div>
+    <div class="brand" id="stage-tag">STAGE 1</div>
   </div>
 
   <div class="profile-card" id="profile-card">
@@ -348,87 +313,83 @@
       <div class="loading-line" style="grid-column:1/-1;">загрузка статистики…</div>
     </div>
 
+    <div class="section-title spaced">Разделы</div>
+    <div class="quick-grid">
+      <div class="quick-card" data-goto="games"><span class="icon">🎮</span><div class="name">Игры</div></div>
+      <div class="quick-card" data-goto="cases"><span class="icon">📦</span><div class="name">Кейсы</div></div>
+      <div class="quick-card" data-goto="shop"><span class="icon">🛒</span><div class="name">Магазин</div></div>
+      <div class="quick-card" data-goto="inventory"><span class="icon">🎒</span><div class="name">Инвентарь</div></div>
+    </div>
+
     <div class="section-title spaced">Что дальше</div>
     <div class="roadmap-panel">
-      <span class="tag">Этап 4 из 10</span><br>
-      Бой теперь считается по-честному: у каждого выстрела есть шанс
-      промаха, зона попадания (тело/голова), а у врагов — броня и каска,
-      которые режут урон. Наверху экрана боя во время матча — Kill Feed,
-      как в CS.<br><br>
-      На <b>Этапе 5</b> появятся сами бойцы с редкостью (обычная → редкая →
-      эпическая → легендарная → мифическая) — они будут выпадать из тех
-      же кейсов, что уже открываются в боте.
+      <span class="tag">Этап 1</span><br>
+      Структура Web App обновлена под витрину бота: <b>Игры</b> (Crash,
+      Апгрейд, Слоты), отдельные <b>Кейсы</b> и <b>Магазин</b>, защита
+      предметов в <b>Инвентаре</b> и раздел <b>Топ</b>. Режим "Оборона"
+      снят с разработки — вся игровая логика дальше переносится из
+      бота напрямую сюда.<br><br>
+      Дальше по плану: сам перенос игр в разделе <b>Игры</b>, затем
+      экономика кейсов/магазина, затем топы и единый визуальный стиль.
     </div>
   </div>
 
-  <!-- ИГРАТЬ -->
-  <div class="view" id="view-play">
-    <div class="section-title">Играть</div>
+  <!-- ИГРЫ -->
+  <div class="view" id="view-games">
+    <div id="games-list">
+      <div class="section-title">Игры</div>
 
-    <div id="play-select">
-      <div class="side-grid">
-        <div class="side-card t" data-side="t">
-          <span class="icon">🔴</span>
-          <div class="name">Террористы</div>
-          <div class="desc">Бомба уже установлена. Удержи точку и отбей все волны.</div>
+      <div class="game-card crash" data-game="crash">
+        <span class="icon">📈</span>
+        <div class="info">
+          <div class="name">Crash</div>
+          <div class="desc">Коэффициент растёт в реальном времени — забери выигрыш до краша.</div>
         </div>
-        <div class="side-card ct" data-side="ct">
-          <span class="icon">🔵</span>
-          <div class="name">Контр-террористы</div>
-          <div class="desc">Не дай врагу дойти до точки и поставить бомбу.</div>
-        </div>
+        <span class="arrow">›</span>
       </div>
 
-      <button class="btn-primary" id="play-btn">Выбери сторону</button>
+      <div class="game-card upgrade" data-game="upgrade">
+        <span class="icon">⚡</span>
+        <div class="info">
+          <div class="name">Апгрейд</div>
+          <div class="desc">Улучшай предметы из инвентаря с шансом на успех.</div>
+        </div>
+        <span class="arrow">›</span>
+      </div>
 
-      <div class="play-note">
-        <b>Этап 4:</b> башни теперь не бьют без промаха — есть шанс
-        попадания, зона попадания (тело/голова) и Kill Feed сверху экрана,
-        как в матче CS. С волны 2 у врагов появляется броня, с волны 4 —
-        ещё и каска, последняя волна — элита с усиленной защитой и
-        скоростью. Хедшот без каски почти всегда смертелен, с кевларом —
-        уже не факт.
+      <div class="game-card slots" data-game="slots">
+        <span class="icon">🎰</span>
+        <div class="info">
+          <div class="name">Слоты</div>
+          <div class="desc">Классические слоты на игровые монеты.</div>
+        </div>
+        <span class="arrow">›</span>
       </div>
     </div>
 
-    <div id="play-battle" class="hidden">
-      <div class="battle-hud">
-        <div class="hud-stat"><div class="lbl">Волна</div><div class="val" id="hud-wave">1/5</div></div>
-        <div class="hud-stat"><div class="lbl">Убийств</div><div class="val" id="hud-kills">0</div></div>
-        <div class="hud-stat"><div class="lbl">Точность</div><div class="val" id="hud-accuracy">0%</div></div>
-        <div class="hud-stat"><div class="lbl">Бойцов</div><div class="val" id="hud-towers">0/4</div></div>
-      </div>
-
-      <div class="point-hp-wrap">
-        <div class="lbl">Здоровье точки</div>
-        <div class="hp-track"><div class="hp-fill" id="point-hp-fill"></div></div>
-      </div>
-
-      <div class="battle-canvas-wrap">
-        <canvas id="battle-canvas" width="800" height="450"></canvas>
-        <div id="kill-feed"></div>
-      </div>
-
-      <div class="build-hint">Тапни по <b>пустой точке</b> у дороги, чтобы поставить бойца (бесплатно на этом этапе). 🛡 — броня, ⛑ — каска, ★ — элитный противник.</div>
-
-      <button class="quit-btn" id="quit-btn">Сдаться</button>
+    <div id="games-detail" class="hidden">
+      <button class="subview-back" id="games-back-btn">‹ Все игры</button>
+      <div class="placeholder-panel" id="games-detail-body"></div>
     </div>
+  </div>
 
-    <div id="play-result" class="hidden">
-      <div class="result-card">
-        <div class="result-title" id="result-title">Победа</div>
-        <div class="result-sub" id="result-sub">Волна 5 из 5</div>
-        <div class="result-stats" id="result-stats"></div>
-        <button class="result-btn" id="result-again-btn">Играть снова</button>
-      </div>
+  <!-- КЕЙСЫ -->
+  <div class="view" id="view-cases">
+    <div class="section-title">Кейсы</div>
+    <div id="cases-list">
+      <div class="loading-line">загрузка кейсов…</div>
     </div>
   </div>
 
   <!-- МАГАЗИН -->
   <div class="view" id="view-shop">
     <div class="section-title">Магазин</div>
-    <div id="shop-list">
-      <div class="loading-line">загрузка кейсов…</div>
+    <div class="placeholder-panel">
+      <span class="big">🛒</span>
+      Магазин за игровые монеты в разработке.<br>
+      Здесь появятся эксклюзивные предметы, которые нельзя получить
+      из кейсов или которые выпадают с крайне низкой вероятностью.
+      <div class="stage-note">Этап 2</div>
     </div>
   </div>
 
@@ -448,14 +409,34 @@
     </div>
   </div>
 
+  <!-- ТОП -->
+  <div class="view" id="view-top">
+    <div class="section-title">Топ игроков</div>
+    <div class="top-switch" id="top-switch">
+      <button class="active" data-top="coins">Монеты</button>
+      <button data-top="level">Уровень</button>
+      <button data-top="item">Дорогой дроп</button>
+    </div>
+    <div id="top-list">
+      <div class="placeholder-panel">
+        <span class="big">🏆</span>
+        Рейтинги подключаются к общей базе бота на Этапе 3.<br>
+        Здесь появятся три отдельных топа с быстрым переключением.
+        <div class="stage-note">Этап 3</div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <nav class="tabbar">
   <button class="tab active" data-tab="home"><span class="icon">🏠</span>Главная</button>
-  <button class="tab" data-tab="play"><span class="icon">🎮</span>Играть</button>
+  <button class="tab" data-tab="games"><span class="icon">🎮</span>Игры</button>
+  <button class="tab" data-tab="cases"><span class="icon">📦</span>Кейсы</button>
   <button class="tab" data-tab="shop"><span class="icon">🛒</span>Магазин</button>
   <button class="tab" data-tab="inventory"><span class="icon">🎒</span>Инвентарь</button>
   <button class="tab" data-tab="profile"><span class="icon">👤</span>Профиль</button>
+  <button class="tab" data-tab="top"><span class="icon">🏆</span>Топ</button>
 </nav>
 
 <script>
@@ -550,537 +531,68 @@
     }
   }
 
-  // ==================== ИГРАТЬ: боевой движок (Этап 3) ====================
-  //
-  // Полностью локальная симуляция на Canvas (без внешних библиотек — по
-  // архитектуре проекта: vanilla JS, легче для мобильного Telegram WebView).
-  // Сервер участвует только в начале (отдаёт баланс боя /api/battle/config)
-  // и в конце (принимает итог /api/battle/finish и считает награду сам).
+  // ---------- Игры ----------
+  // Этап 1: только структура и переходы между разделами. Сама игровая
+  // логика (Crash / Апгрейд / Слоты) переносится из бота на следующих
+  // этапах — каждая карточка уже сейчас ведёт в свой собственный
+  // под-экран, чтобы дальше просто заменить содержимое placeholder'а.
+  const GAME_INFO = {
+    crash: {
+      icon: '📈',
+      title: 'Crash',
+      body: 'Здесь появится табло коэффициента с плавной анимацией по кадрам и ставка на монеты. Логика и вероятность краша будут полностью совпадать с командой /crash в боте.',
+    },
+    upgrade: {
+      icon: '⚡',
+      title: 'Апгрейд',
+      body: 'Здесь появится выбор предмета из инвентаря, шанс успеха и анимация улучшения/проигрыша. Игровая логика — без изменений, как в боте.',
+    },
+    slots: {
+      icon: '🎰',
+      title: 'Слоты',
+      body: 'Здесь появятся барабаны с новым балансом: выше шанс выигрыша, ниже размер выигрыша (изменения синхронизированы с ботом).',
+    },
+  };
 
-  const selectEl = document.getElementById('play-select');
-  const battleEl = document.getElementById('play-battle');
-  const resultEl = document.getElementById('play-result');
-  const canvas = document.getElementById('battle-canvas');
-  const ctx = canvas.getContext('2d');
+  const gamesListEl = document.getElementById('games-list');
+  const gamesDetailEl = document.getElementById('games-detail');
+  const gamesDetailBody = document.getElementById('games-detail-body');
 
-  let selectedSide = null; // 't' | 'ct'
-  let battleConfig = null;
-
-  // Путь врага — ломаная линия в логических координатах канваса (800x450).
-  // Для стороны T (мы обороняем уже заложенную бомбу) точка — 💣.
-  // Для стороны CT (мешаем заложить бомбу) точка — 🎯.
-  const PATH = [
-    { x: -20, y: 90 },
-    { x: 210, y: 90 },
-    { x: 210, y: 310 },
-    { x: 530, y: 310 },
-    { x: 530, y: 150 },
-    { x: 760, y: 150 },
-  ];
-
-  const BUILD_SPOTS = [
-    { x: 210, y: 190 },
-    { x: 370, y: 310 },
-    { x: 530, y: 230 },
-    { x: 650, y: 150 },
-  ];
-
-  // Позывные противников — только для Kill Feed, чисто оформительские,
-  // не завязаны ни на какие реальные команды/персонажей.
-  const ENEMY_NAMES = [
-    'Ghost', 'Viper', 'Reaper', 'Havoc', 'Raptor', 'Falcon', 'Cobra',
-    'Widow', 'Jackal', 'Ronin', 'Specter', 'Rook', 'Talon', 'Warden',
-    'Ash', 'Blitz', 'Nomad', 'Saber', 'Vex', 'Krait',
-  ];
-
-  // Броня/каска/скорость противника по номеру волны (Этап 4). Ранние
-  // волны — без защиты, средние — броня, поздние — броня+каска, последняя
-  // волна — элита с усиленной защитой и повышенной скоростью. Считается
-  // от battleConfig.wave_count, поэтому переживёт правку числа волн.
-  function enemyTierForWave(wave) {
-    const total = battleConfig.wave_count;
-    if (wave >= total) {
-      return {
-        key: 'elite', armor: true, helmet: true,
-        armorReduction: battleConfig.elite_armor_reduction,
-        helmetReduction: battleConfig.elite_helmet_reduction,
-        speedMul: battleConfig.elite_speed_multiplier,
-      };
-    }
-    const ratio = wave / total;
-    if (ratio > 0.6) {
-      return {
-        key: 'heavy', armor: true, helmet: true,
-        armorReduction: battleConfig.armor_damage_reduction,
-        helmetReduction: battleConfig.helmet_headshot_reduction,
-        speedMul: 1,
-      };
-    }
-    if (ratio > 0.3) {
-      return {
-        key: 'light', armor: true, helmet: false,
-        armorReduction: battleConfig.armor_damage_reduction,
-        helmetReduction: 0,
-        speedMul: 1,
-      };
-    }
-    return { key: 'none', armor: false, helmet: false, armorReduction: 0, helmetReduction: 0, speedMul: 1 };
-  }
-
-  function pathTotalLength() {
-    let total = 0;
-    for (let i = 0; i < PATH.length - 1; i++) {
-      total += Math.hypot(PATH[i + 1].x - PATH[i].x, PATH[i + 1].y - PATH[i].y);
-    }
-    return total;
-  }
-  const PATH_LENGTH = pathTotalLength();
-
-  // Переводит долю пройденного пути t (0..1) в координаты x,y.
-  function pointAtT(t) {
-    let dist = t * PATH_LENGTH;
-    for (let i = 0; i < PATH.length - 1; i++) {
-      const segLen = Math.hypot(PATH[i + 1].x - PATH[i].x, PATH[i + 1].y - PATH[i].y);
-      if (dist <= segLen || i === PATH.length - 2) {
-        const ratio = segLen === 0 ? 0 : Math.min(1, dist / segLen);
-        return {
-          x: PATH[i].x + (PATH[i + 1].x - PATH[i].x) * ratio,
-          y: PATH[i].y + (PATH[i + 1].y - PATH[i].y) * ratio,
-        };
-      }
-      dist -= segLen;
-    }
-    return PATH[PATH.length - 1];
-  }
-
-  async function loadBattleConfig() {
-    if (!battleConfig) battleConfig = await apiGet('/api/battle/config');
-    return battleConfig;
-  }
-
-  function initPlayTab() {
-    const cards = document.querySelectorAll('.side-card');
-    const btn = document.getElementById('play-btn');
-
-    cards.forEach(card => {
-      card.addEventListener('click', () => {
-        selectedSide = card.dataset.side;
-        cards.forEach(c => c.classList.toggle('selected', c === card));
-        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        btn.textContent = selectedSide === 't' ? 'Начать бой: Террористы' : 'Начать бой: Контр-террористы';
-        btn.classList.add('ready');
-      });
-    });
-
-    btn.addEventListener('click', async () => {
-      if (!selectedSide) return;
-      try {
-        await loadBattleConfig();
-      } catch (e) {
-        alert('Не удалось загрузить настройки боя. Попробуй ещё раз.');
-        return;
-      }
-      startBattle();
-    });
-
-    document.getElementById('quit-btn').addEventListener('click', () => {
-      if (game && game.running) finishBattle(false);
-    });
-
-    document.getElementById('result-again-btn').addEventListener('click', () => {
-      resultEl.classList.add('hidden');
-      selectEl.classList.remove('hidden');
-    });
-  }
-
-  let game = null; // состояние текущего боя
-
-  function startBattle() {
-    const cfg = battleConfig;
-    selectEl.classList.add('hidden');
-    resultEl.classList.add('hidden');
-    battleEl.classList.remove('hidden');
-
-    game = {
-      running: true,
-      side: selectedSide,
-      wave: 1,
-      pointHp: cfg.point_hp,
-      pointMaxHp: cfg.point_hp,
-      kills: 0,
-      towers: [],
-      enemies: [],
-      spawnQueue: 0,
-      spawnTimer: 0,
-      waveClearedAt: null,
-      lastFrameTime: null,
-      // Этап 4: статистика стрельбы за бой — уходит на сервер по итогу.
-      shotsFired: 0,
-      hits: 0,
-      misses: 0,
-      headshots: 0,
-      damageDealt: 0,
-    };
-
-    const feedEl = document.getElementById('kill-feed');
-    if (feedEl) feedEl.innerHTML = '';
-
-    spawnWave();
-    updateHud();
-    requestAnimationFrame(gameLoop);
-  }
-
-  function currentWaveEnemyCount() {
-    return battleConfig.base_enemy_count + (game.wave - 1) * battleConfig.enemy_count_step;
-  }
-  function currentWaveEnemyHp() {
-    return battleConfig.base_enemy_hp + (game.wave - 1) * battleConfig.enemy_hp_step;
-  }
-  function currentWaveEnemySpeed() {
-    return battleConfig.base_enemy_speed + (game.wave - 1) * battleConfig.enemy_speed_step;
-  }
-
-  function spawnWave() {
-    game.spawnQueue = currentWaveEnemyCount();
-    game.spawnTimer = 0;
-  }
-
-  function handleCanvasClick(evt) {
-    if (!game || !game.running) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (evt.clientX - rect.left) * scaleX;
-    const y = (evt.clientY - rect.top) * scaleY;
-
-    if (game.towers.length >= battleConfig.max_towers) return;
-
-    for (const spot of BUILD_SPOTS) {
-      const occupied = game.towers.some(t => t.spotX === spot.x && t.spotY === spot.y);
-      if (occupied) continue;
-      if (Math.hypot(spot.x - x, spot.y - y) < 26) {
-        game.towers.push({
-          spotX: spot.x, spotY: spot.y,
-          x: spot.x, y: spot.y,
-          cooldown: 0,
-          flashUntil: 0,
-        });
-        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-        updateHud();
-        return;
-      }
-    }
-  }
-  canvas.addEventListener('click', handleCanvasClick);
-
-  function updateHud() {
-    document.getElementById('hud-wave').textContent = `${game.wave}/${battleConfig.wave_count}`;
-    document.getElementById('hud-kills').textContent = String(game.kills);
-    document.getElementById('hud-towers').textContent = `${game.towers.length}/${battleConfig.max_towers}`;
-    const acc = game.shotsFired > 0 ? Math.round((game.hits / game.shotsFired) * 100) : 0;
-    document.getElementById('hud-accuracy').textContent = acc + '%';
-    const pct = Math.max(0, Math.round((game.pointHp / game.pointMaxHp) * 100));
-    document.getElementById('point-hp-fill').style.width = pct + '%';
-  }
-
-  // Kill Feed (Этап 4): показывает только смертельный выстрел, с иконкой
-  // оружия и, если это был хедшот, отдельной пометкой — как в CS.
-  function pushKillFeed(enemy, isHeadshot) {
-    const feed = document.getElementById('kill-feed');
-    if (!feed) return;
-    const row = document.createElement('div');
-    row.className = 'kf-row';
-    const weaponName = battleConfig.tower_weapon_name || 'Боец';
-    const weaponIcon = battleConfig.tower_weapon_icon || '🔫';
-    row.innerHTML =
-      `<span class="kf-shooter">${escapeHtml(weaponName)}</span>` +
-      `<span class="kf-weapon">${weaponIcon}</span>` +
-      (isHeadshot ? `<span class="kf-headshot">HEADSHOT</span>` : '') +
-      `<span class="kf-target">${escapeHtml(enemy.name)}</span>`;
-    feed.appendChild(row);
-    while (feed.children.length > 5) feed.removeChild(feed.firstChild);
-    setTimeout(() => {
-      row.classList.add('kf-fade');
-      setTimeout(() => row.remove(), 500);
-    }, 2600);
-  }
-
-  function gameLoop(ts) {
-    if (!game || !game.running) return;
-    if (game.lastFrameTime === null) game.lastFrameTime = ts;
-    const dt = Math.min(0.05, (ts - game.lastFrameTime) / 1000); // капаем dt, чтобы не телепортировало при лаге вкладки
-    game.lastFrameTime = ts;
-
-    stepGame(dt);
-    renderGame();
-
-    if (game.running) requestAnimationFrame(gameLoop);
-  }
-
-  function stepGame(dt) {
-    // Спавн врагов текущей волны, по одному, с небольшим интервалом.
-    if (game.spawnQueue > 0) {
-      game.spawnTimer -= dt;
-      if (game.spawnTimer <= 0) {
-        const tier = enemyTierForWave(game.wave);
-        const hp = currentWaveEnemyHp();
-        game.enemies.push({
-          t: 0,
-          hp,
-          maxHp: hp,
-          speed: currentWaveEnemySpeed() * tier.speedMul,
-          alive: true,
-          tierKey: tier.key,
-          armor: tier.armor,
-          helmet: tier.helmet,
-          armorReduction: tier.armorReduction,
-          helmetReduction: tier.helmetReduction,
-          name: ENEMY_NAMES[Math.floor(Math.random() * ENEMY_NAMES.length)],
-        });
-        game.spawnQueue--;
-        game.spawnTimer = 0.9;
-      }
-    }
-
-    // Движение врагов по пути.
-    for (const e of game.enemies) {
-      if (!e.alive) continue;
-      e.t += e.speed * dt;
-      if (e.t >= 1) {
-        e.alive = false;
-        game.pointHp -= battleConfig.enemy_damage_to_point;
-        if (game.pointHp <= 0) {
-          game.pointHp = 0;
-          updateHud();
-          finishBattle(false);
-          return;
-        }
-      }
-    }
-
-    // Стрельба башен (Этап 4): каждый выстрел считается отдельно —
-    // шанс промаха, зона попадания (тело/голова), броня и каска гасят урон.
-    for (const tower of game.towers) {
-      tower.cooldown -= dt;
-      if (tower.cooldown > 0) continue;
-
-      let target = null;
-      let bestDist = battleConfig.tower_range;
-      for (const e of game.enemies) {
-        if (!e.alive) continue;
-        const p = pointAtT(e.t);
-        const dist = Math.hypot(p.x - tower.x, p.y - tower.y);
-        if (dist <= bestDist) {
-          bestDist = dist;
-          target = e;
-        }
-      }
-
-      if (target) {
-        tower.cooldown = battleConfig.tower_fire_interval;
-        tower.flashUntil = performance.now() + 90;
-        game.shotsFired++;
-
-        const isHit = Math.random() < battleConfig.tower_accuracy;
-        if (!isHit) {
-          game.misses++;
-        } else {
-          game.hits++;
-          const isHeadshot = Math.random() < battleConfig.tower_headshot_chance;
-          let dmg;
-          if (isHeadshot) {
-            game.headshots++;
-            dmg = battleConfig.tower_damage * battleConfig.headshot_multiplier;
-            if (target.helmet) dmg *= (1 - target.helmetReduction);
-          } else {
-            dmg = battleConfig.tower_damage;
-            if (target.armor) dmg *= (1 - target.armorReduction);
-          }
-          dmg = Math.max(1, Math.round(dmg));
-          target.hp -= dmg;
-          game.damageDealt += dmg;
-
-          if (target.hp <= 0) {
-            target.alive = false;
-            game.kills++;
-            pushKillFeed(target, isHeadshot);
-          }
-        }
-      }
-    }
-
-    game.enemies = game.enemies.filter(e => e.alive);
-    updateHud();
-
-    // Волна завершена, когда все враги волны заспавнены, убиты/дошли,
-    // и очередь спавна пуста.
-    if (game.spawnQueue === 0 && game.enemies.length === 0) {
-      if (game.waveClearedAt === null) {
-        game.waveClearedAt = performance.now();
-      } else if (performance.now() - game.waveClearedAt > 900) {
-        if (game.wave >= battleConfig.wave_count) {
-          finishBattle(true);
-        } else {
-          game.wave++;
-          game.waveClearedAt = null;
-          spawnWave();
-        }
-      }
-    }
-  }
-
-  function renderGame() {
-    const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    // Дорога.
-    ctx.strokeStyle = '#2a3122';
-    ctx.lineWidth = 26;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(PATH[0].x, PATH[0].y);
-    for (let i = 1; i < PATH.length; i++) ctx.lineTo(PATH[i].x, PATH[i].y);
-    ctx.stroke();
-    ctx.strokeStyle = '#1c211a';
-    ctx.lineWidth = 20;
-    ctx.stroke();
-
-    // Точка (цель) в конце пути.
-    const end = PATH[PATH.length - 1];
-    ctx.font = '28px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(game.side === 't' ? '💣' : '🎯', end.x, end.y);
-
-    // Слоты для построек.
-    for (const spot of BUILD_SPOTS) {
-      const occupied = game.towers.some(t => t.spotX === spot.x && t.spotY === spot.y);
-      if (!occupied) {
-        ctx.beginPath();
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = '#8a6a1f';
-        ctx.lineWidth = 2;
-        ctx.arc(spot.x, spot.y, 16, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    }
-
-    // Башни (бойцы) + радиус действия + вспышка выстрела.
-    for (const tower of game.towers) {
-      const flashing = performance.now() < tower.flashUntil;
-      ctx.beginPath();
-      ctx.fillStyle = 'rgba(224,167,46,0.08)';
-      ctx.arc(tower.x, tower.y, battleConfig.tower_range, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.fillStyle = flashing ? '#f5c451' : '#e0a72e';
-      ctx.arc(tower.x, tower.y, 15, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.font = '16px sans-serif';
-      ctx.fillStyle = '#0b0d0a';
-      ctx.fillText('🔫', tower.x, tower.y + 1);
-    }
-
-    // Враги + полоска HP + индикаторы брони/каски/элиты (Этап 4).
-    const enemyColor = game.side === 't' ? '#4a90d9' : '#c1462f';
-    for (const e of game.enemies) {
-      const p = pointAtT(e.t);
-      ctx.beginPath();
-      ctx.fillStyle = enemyColor;
-      ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
-      ctx.fill();
-
-      if (e.armor) {
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = e.helmet ? '#f5c451' : '#9b9b9b';
-        ctx.stroke();
-      }
-      if (e.tierKey === 'elite') {
-        ctx.font = '11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#f5c451';
-        ctx.fillText('★', p.x, p.y - 24);
-      }
-
-      const barW = 22;
-      ctx.fillStyle = '#2a3122';
-      ctx.fillRect(p.x - barW / 2, p.y - 20, barW, 4);
-      ctx.fillStyle = '#7fae3f';
-      ctx.fillRect(p.x - barW / 2, p.y - 20, barW * Math.max(0, e.hp / e.maxHp), 4);
-    }
-  }
-
-  async function finishBattle(won) {
-    if (!game || !game.running) return;
-    game.running = false;
-
-    // Если проиграли на волне N (не зачистив её) — засчитываем N-1 полностью
-    // пройденных волн; если это была первая волна — 0.
-    const finalWave = won ? battleConfig.wave_count : Math.max(0, game.wave - 1);
-
-    let rewardInfo = null;
-    try {
-      const res = await fetch('/api/battle/finish', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': initData,
-        },
-        body: JSON.stringify({
-          side: game.side, wave_reached: finalWave, won,
-          shots_fired: game.shotsFired, hits: game.hits,
-          headshots: game.headshots, damage_dealt: Math.round(game.damageDealt),
-        }),
-      });
-      if (res.ok) rewardInfo = await res.json();
-    } catch (e) {
-      // Даже если сеть подвела — покажем локальный итог боя, просто без наград.
-    }
-
-    showResult(won, finalWave, rewardInfo);
-
-    // Обновлённые данные (баланс, статистика) — сбрасываем кэш, чтобы
-    // Главная/Профиль подтянули их заново при следующем открытии.
-    statsCache = null;
-    battleEl.classList.add('hidden');
-  }
-
-  function showResult(won, finalWave, rewardInfo) {
-    document.getElementById('result-title').textContent = won ? 'Победа' : 'Поражение';
-    document.getElementById('result-title').className = 'result-title ' + (won ? 'win' : 'lose');
-    document.getElementById('result-sub').textContent = `Волна ${finalWave} из ${battleConfig.wave_count}`;
-
-    const coins = rewardInfo ? rewardInfo.reward_coins : 0;
-    const xp = rewardInfo ? rewardInfo.reward_xp : 0;
-    const bestWave = rewardInfo ? rewardInfo.best_wave : finalWave;
-    const accuracy = rewardInfo && typeof rewardInfo.accuracy_pct === 'number'
-      ? rewardInfo.accuracy_pct
-      : (game.shotsFired ? Math.round((game.hits / game.shotsFired) * 100) : 0);
-
-    document.getElementById('result-stats').innerHTML = `
-      <div class="stat-card"><div class="val">${game.kills}</div><div class="lbl">Убийств</div></div>
-      <div class="stat-card"><div class="val">+${fmt(coins)}</div><div class="lbl">Монет</div></div>
-      <div class="stat-card"><div class="val">+${fmt(xp)}</div><div class="lbl">Опыта</div></div>
-      <div class="stat-card"><div class="val">${fmt(bestWave)}</div><div class="lbl">Рекорд волн</div></div>
-      <div class="stat-card"><div class="val">${accuracy}%</div><div class="lbl">Точность</div></div>
-      <div class="stat-card"><div class="val">${game.headshots}</div><div class="lbl">Хедшотов</div></div>
+  function openGame(key) {
+    const g = GAME_INFO[key];
+    if (!g) return;
+    gamesDetailBody.innerHTML = `
+      <span class="big">${g.icon}</span>
+      <b style="color:var(--text); font-size:15px; display:block; margin-bottom:6px;">${g.title}</b>
+      ${g.body}
+      <div class="stage-note">Скоро</div>
     `;
-
-    resultEl.classList.remove('hidden');
-
-    if (rewardInfo && rewardInfo.level_info && rewardInfo.level_info.leveled_up && tg?.HapticFeedback) {
-      tg.HapticFeedback.notificationOccurred('success');
-    }
+    gamesListEl.classList.add('hidden');
+    gamesDetailEl.classList.remove('hidden');
   }
 
-  // ---------- Магазин ----------
-  let shopLoaded = false;
-  async function renderShop() {
-    if (shopLoaded) return;
-    const el = document.getElementById('shop-list');
+  document.querySelectorAll('.game-card').forEach(card => {
+    card.addEventListener('click', () => {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      openGame(card.dataset.game);
+    });
+  });
+
+  document.getElementById('games-back-btn').addEventListener('click', () => {
+    gamesDetailEl.classList.add('hidden');
+    gamesListEl.classList.remove('hidden');
+  });
+
+  function resetGamesView() {
+    gamesDetailEl.classList.add('hidden');
+    gamesListEl.classList.remove('hidden');
+  }
+
+  // ---------- Кейсы ----------
+  let casesLoaded = false;
+  async function renderCases() {
+    if (casesLoaded) return;
+    const el = document.getElementById('cases-list');
     try {
       const data = await apiGet('/api/shop/cases');
       const cardsHtml = data.cases.map(c => `
@@ -1095,10 +607,10 @@
           </div>
         </div>
       `).join('');
-      el.innerHTML = cardsHtml + `<div class="shop-hint">Открытие кейсов пока доступно в самом боте (/cases) — прямая покупка из Web App появится на Этапе 7.</div>`;
-      shopLoaded = true;
+      el.innerHTML = cardsHtml + `<div class="shop-hint">Открытие кейсов пока доступно в самом боте (/cases) — прямое открытие из Web App появится на следующем этапе.</div>`;
+      casesLoaded = true;
     } catch (e) {
-      el.innerHTML = `<div class="error-line">не удалось загрузить магазин</div>`;
+      el.innerHTML = `<div class="error-line">не удалось загрузить кейсы</div>`;
     }
   }
 
@@ -1119,7 +631,10 @@
               <div class="item-name">${escapeHtml(i.name)}</div>
               <div class="item-rarity">${escapeHtml(i.rarity)}</div>
             </div>
-            <div class="item-price">${fmt(i.price)}</div>
+            <div class="item-right">
+              <div class="item-price">${fmt(i.price)}</div>
+              <div class="lock-btn" title="Защита предмета появится на Этапе 2">🔓</div>
+            </div>
           </div>
         `).join('');
         el.innerHTML = summary + rows;
@@ -1148,11 +663,6 @@
         ['Апгрейдов неудачно', fmt(s.upgrades_failed)],
         ['Побед в джекпоте', fmt(s.jackpot_wins)],
         ['Предметов в инвентаре', fmt(s.items_count)],
-        ['TD: боёв сыграно', fmt(s.td_battles_played)],
-        ['TD: побед', fmt(s.td_wins)],
-        ['TD: рекорд волн', fmt(s.td_best_wave)],
-        ['TD: точность', `${fmt(s.td_accuracy_pct)}%`],
-        ['TD: хедшотов', fmt(s.td_headshots)],
       ];
       let html = `<div class="profile-stat-list">` +
         rows.map(([k, v]) => `<div class="profile-stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') +
@@ -1173,35 +683,53 @@
     }
   }
 
+  // ---------- Топ ----------
+  // Этап 1: только переключатель между тремя рейтингами (визуально).
+  // Реальные данные подключаются к общей базе бота на Этапе 3.
+  document.querySelectorAll('#top-switch button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#top-switch button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    });
+  });
+
   // ---------- Навигация по вкладкам ----------
   const tabRenderers = {
     home: renderHome,
-    play: () => {}, // сторона выбирается локально, перерисовка не нужна
-    shop: renderShop,
+    games: resetGamesView,
+    cases: renderCases,
+    shop: () => {},
     inventory: renderInventory,
     profile: renderProfileTab,
+    top: () => {},
   };
+
+  function goToTab(tabId) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + tabId).classList.add('active');
+    const renderer = tabRenderers[tabId];
+    if (renderer) renderer();
+  }
 
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      const tabId = btn.dataset.tab;
-
-      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.getElementById('view-' + tabId).classList.add('active');
-
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      goToTab(btn.dataset.tab);
+    });
+  });
 
-      const renderer = tabRenderers[tabId];
-      if (renderer) renderer();
+  // Быстрые ссылки с Главной ведут на нужную вкладку низа экрана.
+  document.querySelectorAll('.quick-card').forEach(card => {
+    card.addEventListener('click', () => {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      goToTab(card.dataset.goto);
     });
   });
 
   loadProfile();
   renderHome();
-  initPlayTab();
 </script>
 
 </body>
