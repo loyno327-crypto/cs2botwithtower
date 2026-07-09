@@ -322,6 +322,28 @@
   .slots-again-row{display:flex; gap:8px; margin-top:4px;}
   .slots-again-row .slots-spin-btn{flex:1;}
 
+  .paytable{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:4px 12px; margin-bottom:12px;
+  }
+  .paytable-head{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--mono); font-size:10px; letter-spacing:1.5px; color:var(--text-dim);
+    text-transform:uppercase; padding:9px 0; border-bottom:1px solid var(--line);
+  }
+  .paytable-head span:last-child{display:flex; gap:16px;}
+  .paytable-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:8px 0; border-bottom:1px solid var(--line);
+  }
+  .paytable-row:last-child{border-bottom:none;}
+  .paytable-left{display:flex; align-items:center; gap:10px; min-width:0;}
+  .paytable-icon{font-size:21px; width:26px; text-align:center; flex-shrink:0;}
+  .paytable-name{font-size:12.5px; font-weight:600; color:var(--text); white-space:nowrap;}
+  .paytable-mults{display:flex; gap:16px; font-family:var(--mono); font-size:12px; color:var(--text-dim); flex-shrink:0;}
+  .paytable-mults b{color:var(--amber); font-weight:600;}
+  .paytable-mults .mult-lbl{font-size:9px; display:block; letter-spacing:.5px; color:var(--text-dim); text-align:center;}
+
   /* ---- Магазин: кейсы ---- */
   .case-card{
     background:var(--panel); border:1px solid var(--line); border-radius:6px;
@@ -582,6 +604,8 @@
         </div>
         <div class="slots-result" id="slots-result">Выбери ставку и крути барабан</div>
       </div>
+
+      <div class="paytable" id="slots-paytable"></div>
 
       <div class="crash-error" id="slots-error"></div>
 
@@ -1174,11 +1198,15 @@
         return;
       }
 
-      loadProfile();
-      statsCache = null;
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 
       await Promise.all(reelEls.map((el, i) => spinReel(el, data.reels[i].icon, REEL_DURATIONS[i])));
+
+      // Баланс наверху обновляем только сейчас, ПОСЛЕ того как барабаны
+      // остановились и результат виден — иначе цифра в шапке скакала бы
+      // раньше, чем игрок увидит, что выпало.
+      loadProfile();
+      statsCache = null;
 
       if (data.payout > 0) {
         slotsStageEl.classList.add('state-win');
@@ -1214,6 +1242,29 @@
     }
   }
 
+  function renderSlotsPaytable() {
+    const el = document.getElementById('slots-paytable');
+    const sorted = [...slotsCfg.symbols].sort((a, b) => b.payout - a.payout);
+    el.innerHTML = `
+      <div class="paytable-head">
+        <span>Символ</span>
+        <span><span>3 в ряд</span><span>2 из 3</span></span>
+      </div>
+      ${sorted.map(s => `
+        <div class="paytable-row">
+          <div class="paytable-left">
+            <span class="paytable-icon">${s.icon}</span>
+            <span class="paytable-name">${escapeHtml(s.name)}</span>
+          </div>
+          <div class="paytable-mults">
+            <span><b>×${s.payout}</b></span>
+            <span><b>×${s.pair_payout}</b></span>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }
+
   async function initSlotsView() {
     slotsErrorEl.textContent = '';
     slotsResultEl.textContent = 'подключение к серверу…';
@@ -1221,6 +1272,7 @@
     try {
       await loadSlotsConfig();
       reelEls.forEach(el => primeReel(el, slotsCfg.symbols[0].icon));
+      renderSlotsPaytable();
       renderSlotsBetPanel();
     } catch (e) {
       slotsResultEl.textContent = '';

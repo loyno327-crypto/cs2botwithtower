@@ -235,12 +235,12 @@ SHOP_ITEMS = [
 SLOTS_BET_OPTIONS = [50, 100, 250, 500, 1000, 2500]
 
 SLOTS_SYMBOLS = [
-    {"id": "coin",    "icon": "🪙", "weight": 34, "payout": 1.5, "pair_payout": 0.5},
-    {"id": "clover",  "icon": "🍀", "weight": 26, "payout": 2.0, "pair_payout": 0.6},
-    {"id": "gun",     "icon": "🔫", "weight": 18, "payout": 3.5, "pair_payout": 0.8},
-    {"id": "diamond", "icon": "💎", "weight": 12, "payout": 6.0, "pair_payout": 1.0},
-    {"id": "fire",    "icon": "🔥", "weight": 7,  "payout": 12.0, "pair_payout": 1.5},
-    {"id": "seven",   "icon": "7️⃣", "weight": 3,  "payout": 30.0, "pair_payout": 3.0},
+    {"id": "coin",    "icon": "🪙", "name": "Монета",  "weight": 34, "payout": 1.5, "pair_payout": 0.5},
+    {"id": "clover",  "icon": "🍀", "name": "Клевер",  "weight": 26, "payout": 2.0, "pair_payout": 0.6},
+    {"id": "gun",     "icon": "🔫", "name": "Пушка",   "weight": 18, "payout": 3.5, "pair_payout": 0.8},
+    {"id": "diamond", "icon": "💎", "name": "Алмаз",   "weight": 12, "payout": 6.0, "pair_payout": 1.0},
+    {"id": "fire",    "icon": "🔥", "name": "Огонь",   "weight": 7,  "payout": 12.0, "pair_payout": 1.5},
+    {"id": "seven",   "icon": "7️⃣", "name": "Семёрка", "weight": 3,  "payout": 30.0, "pair_payout": 3.0},
 ]
 
 XP_SLOTS_SPIN = 2           # опыт за каждый спин (даже проигрышный)

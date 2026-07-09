@@ -844,7 +844,16 @@ async def handle_slots_config(request: web.Request) -> web.Response:
 
     return web.json_response({
         "bet_options": config.SLOTS_BET_OPTIONS,
-        "symbols": [{"id": s["id"], "icon": s["icon"]} for s in config.SLOTS_SYMBOLS],
+        "symbols": [
+            {
+                "id": s["id"],
+                "icon": s["icon"],
+                "name": s["name"],
+                "payout": s["payout"],
+                "pair_payout": s["pair_payout"],
+            }
+            for s in config.SLOTS_SYMBOLS
+        ],
     })
 
 
