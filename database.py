@@ -166,6 +166,15 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
+    # Миграция таблицы inventory: защита предмета (Этап 2 — "Инвентарь").
+    # Защищённый предмет (is_protected = 1) нельзя продать, использовать
+    # в апгрейде и он не участвует в массовых операциях ("Продать всё").
+    try:
+        cur.execute("ALTER TABLE inventory ADD COLUMN is_protected INTEGER DEFAULT 0")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     # Миграция таблицы jackpot: раньше был один победитель (last_winner_id),
     # теперь джекпот делится между несколькими игроками сразу — храним их
     # id через запятую в last_winner_ids, не трогая старую колонку.
@@ -421,13 +430,32 @@ def remove_item(item_id: int, user_id: int):
 
 
 def remove_all_items(user_id: int):
-    """Удаляет сразу весь инвентарь пользователя (используется кнопкой
-    "Продать всё"), одним запросом вместо цикла по отдельным предметам."""
+    """Удаляет весь НЕЗАЩИЩЁННЫЙ инвентарь пользователя (используется кнопкой
+    "Продать всё") — защищённые предметы (is_protected = 1) в массовых
+    операциях не участвуют и остаются на месте."""
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM inventory WHERE user_id = ?", (user_id,))
+    cur.execute(
+        "DELETE FROM inventory WHERE user_id = ? AND COALESCE(is_protected, 0) = 0",
+        (user_id,)
+    )
     conn.commit()
     conn.close()
+
+
+def set_item_protected(item_id: int, user_id: int, protected: bool) -> bool:
+    """Ставит/снимает защиту с предмета. Возвращает True, если предмет
+    найден и принадлежит пользователю."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE inventory SET is_protected = ? WHERE id = ? AND user_id = ?",
+        (1 if protected else 0, item_id, user_id)
+    )
+    updated = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
 
 
 def update_item_price(item_id: int, user_id: int, new_price: int):

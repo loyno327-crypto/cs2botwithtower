@@ -6,16 +6,66 @@
     "min_level": 1,
     "xp": 5,
     "items": [
-      {"name": "Glock-18 | Sand Dune", "rarity": "Милитари", "price": 15, "weight": 800},
-      {"name": "P250 | Whiteout", "rarity": "Милитари", "price": 12, "weight": 800},
-      {"name": "MP9 | Air Force", "rarity": "Милитари", "price": 18, "weight": 800},
-      {"name": "Nova | Tempest", "rarity": "Милитари", "price": 14, "weight": 800},
-      {"name": "Five-SeveN | Forest Night", "rarity": "Запрещённое", "price": 60, "weight": 160},
-      {"name": "Dual Berettas | Cobra Strike", "rarity": "Запрещённое", "price": 55, "weight": 160},
-      {"name": "M4A4 | Zirka", "rarity": "Засекреченное", "price": 180, "weight": 32},
-      {"name": "USP-S | Torque", "rarity": "Засекреченное", "price": 150, "weight": 32},
-      {"name": "AK-47 | Point Disarray", "rarity": "Тайное", "price": 400, "weight": 6},
-      {"name": "★ Bayonet | Marble Fade", "rarity": "Редкий спецпредмет", "price": 2500, "weight": 1}
+      {
+        "name": "Glock-18 | Sand Dune",
+        "rarity": "Милитари",
+        "price": 15,
+        "weight": 800
+      },
+      {
+        "name": "P250 | Whiteout",
+        "rarity": "Милитари",
+        "price": 12,
+        "weight": 800
+      },
+      {
+        "name": "MP9 | Air Force",
+        "rarity": "Милитари",
+        "price": 18,
+        "weight": 800
+      },
+      {
+        "name": "Nova | Tempest",
+        "rarity": "Милитари",
+        "price": 14,
+        "weight": 800
+      },
+      {
+        "name": "Five-SeveN | Forest Night",
+        "rarity": "Запрещённое",
+        "price": 60,
+        "weight": 160
+      },
+      {
+        "name": "Dual Berettas | Cobra Strike",
+        "rarity": "Запрещённое",
+        "price": 55,
+        "weight": 160
+      },
+      {
+        "name": "M4A4 | Zirka",
+        "rarity": "Засекреченное",
+        "price": 180,
+        "weight": 32
+      },
+      {
+        "name": "USP-S | Torque",
+        "rarity": "Засекреченное",
+        "price": 150,
+        "weight": 32
+      },
+      {
+        "name": "AK-47 | Point Disarray",
+        "rarity": "Тайное",
+        "price": 400,
+        "weight": 6
+      },
+      {
+        "name": "★ Bayonet | Marble Fade",
+        "rarity": "Редкий спецпредмет",
+        "price": 2500,
+        "weight": 1
+      }
     ]
   },
   {
@@ -25,16 +75,66 @@
     "min_level": 1,
     "xp": 8,
     "items": [
-      {"name": "AK-47 | Safari Mesh", "rarity": "Милитари", "price": 30, "weight": 800},
-      {"name": "P250 | Sand Dune", "rarity": "Милитари", "price": 20, "weight": 800},
-      {"name": "MP9 | Storm", "rarity": "Милитари", "price": 35, "weight": 800},
-      {"name": "Nova | Predator", "rarity": "Милитари", "price": 25, "weight": 800},
-      {"name": "M4A1-S | Guardian", "rarity": "Запрещённое", "price": 150, "weight": 160},
-      {"name": "Glock-18 | Weasel", "rarity": "Запрещённое", "price": 120, "weight": 160},
-      {"name": "AK-47 | Elite Build", "rarity": "Засекреченное", "price": 450, "weight": 32},
-      {"name": "USP-S | Cortex", "rarity": "Засекреченное", "price": 350, "weight": 32},
-      {"name": "AWP | Pink DDPAT", "rarity": "Тайное", "price": 1000, "weight": 6},
-      {"name": "★ Karambit | Slaughter", "rarity": "Редкий спецпредмет", "price": 5000, "weight": 1}
+      {
+        "name": "AK-47 | Safari Mesh",
+        "rarity": "Милитари",
+        "price": 30,
+        "weight": 800
+      },
+      {
+        "name": "P250 | Sand Dune",
+        "rarity": "Милитари",
+        "price": 20,
+        "weight": 800
+      },
+      {
+        "name": "MP9 | Storm",
+        "rarity": "Милитари",
+        "price": 35,
+        "weight": 800
+      },
+      {
+        "name": "Nova | Predator",
+        "rarity": "Милитари",
+        "price": 25,
+        "weight": 800
+      },
+      {
+        "name": "M4A1-S | Guardian",
+        "rarity": "Запрещённое",
+        "price": 150,
+        "weight": 160
+      },
+      {
+        "name": "Glock-18 | Weasel",
+        "rarity": "Запрещённое",
+        "price": 120,
+        "weight": 160
+      },
+      {
+        "name": "AK-47 | Elite Build",
+        "rarity": "Засекреченное",
+        "price": 450,
+        "weight": 32
+      },
+      {
+        "name": "USP-S | Cortex",
+        "rarity": "Засекреченное",
+        "price": 350,
+        "weight": 32
+      },
+      {
+        "name": "AWP | Pink DDPAT",
+        "rarity": "Тайное",
+        "price": 1000,
+        "weight": 6
+      },
+      {
+        "name": "★ Karambit | Slaughter",
+        "rarity": "Редкий спецпредмет",
+        "price": 5000,
+        "weight": 1
+      }
     ]
   },
   {
@@ -44,15 +144,60 @@
     "min_level": 3,
     "xp": 12,
     "items": [
-      {"name": "Galil AR | Sage Spray", "rarity": "Милитари", "price": 90, "weight": 800},
-      {"name": "Five-SeveN | Kami", "rarity": "Милитари", "price": 110, "weight": 800},
-      {"name": "MAC-10 | Toxic", "rarity": "Милитари", "price": 130, "weight": 800},
-      {"name": "AK-47 | Blue Laminate", "rarity": "Запрещённое", "price": 300, "weight": 160},
-      {"name": "Desert Eagle | Naga", "rarity": "Запрещённое", "price": 400, "weight": 160},
-      {"name": "M4A4 | Neo-Noir", "rarity": "Засекреченное", "price": 900, "weight": 32},
-      {"name": "AWP | Electric Hive", "rarity": "Засекреченное", "price": 1100, "weight": 32},
-      {"name": "AK-47 | Fuel Injector", "rarity": "Тайное", "price": 2500, "weight": 6},
-      {"name": "★ Butterfly Knife | Doppler", "rarity": "Редкий спецпредмет", "price": 9000, "weight": 1}
+      {
+        "name": "Galil AR | Sage Spray",
+        "rarity": "Милитари",
+        "price": 90,
+        "weight": 800
+      },
+      {
+        "name": "Five-SeveN | Kami",
+        "rarity": "Милитари",
+        "price": 110,
+        "weight": 800
+      },
+      {
+        "name": "MAC-10 | Toxic",
+        "rarity": "Милитари",
+        "price": 130,
+        "weight": 800
+      },
+      {
+        "name": "AK-47 | Blue Laminate",
+        "rarity": "Запрещённое",
+        "price": 300,
+        "weight": 160
+      },
+      {
+        "name": "Desert Eagle | Naga",
+        "rarity": "Запрещённое",
+        "price": 400,
+        "weight": 160
+      },
+      {
+        "name": "M4A4 | Neo-Noir",
+        "rarity": "Засекреченное",
+        "price": 900,
+        "weight": 32
+      },
+      {
+        "name": "AWP | Electric Hive",
+        "rarity": "Засекреченное",
+        "price": 1100,
+        "weight": 32
+      },
+      {
+        "name": "AK-47 | Fuel Injector",
+        "rarity": "Тайное",
+        "price": 2500,
+        "weight": 6
+      },
+      {
+        "name": "★ Butterfly Knife | Doppler",
+        "rarity": "Редкий спецпредмет",
+        "price": 9000,
+        "weight": 1
+      }
     ]
   },
   {
@@ -62,14 +207,54 @@
     "min_level": 7,
     "xp": 18,
     "items": [
-      {"name": "M4A1-S | VariCamo", "rarity": "Милитари", "price": 180, "weight": 800},
-      {"name": "P90 | Asiimov", "rarity": "Милитари", "price": 220, "weight": 800},
-      {"name": "AK-47 | Bloodsport", "rarity": "Запрещённое", "price": 700, "weight": 160},
-      {"name": "USP-S | Kill Confirmed", "rarity": "Запрещённое", "price": 750, "weight": 160},
-      {"name": "AWP | Wildfire", "rarity": "Засекреченное", "price": 2000, "weight": 32},
-      {"name": "M4A4 | Asiimov", "rarity": "Засекреченное", "price": 2200, "weight": 32},
-      {"name": "AK-47 | Wild Lotus", "rarity": "Тайное", "price": 5000, "weight": 6},
-      {"name": "★ Karambit | Fade", "rarity": "Редкий спецпредмет", "price": 15000, "weight": 1}
+      {
+        "name": "M4A1-S | VariCamo",
+        "rarity": "Милитари",
+        "price": 180,
+        "weight": 800
+      },
+      {
+        "name": "P90 | Asiimov",
+        "rarity": "Милитари",
+        "price": 220,
+        "weight": 800
+      },
+      {
+        "name": "AK-47 | Bloodsport",
+        "rarity": "Запрещённое",
+        "price": 700,
+        "weight": 160
+      },
+      {
+        "name": "USP-S | Kill Confirmed",
+        "rarity": "Запрещённое",
+        "price": 750,
+        "weight": 160
+      },
+      {
+        "name": "AWP | Wildfire",
+        "rarity": "Засекреченное",
+        "price": 2000,
+        "weight": 32
+      },
+      {
+        "name": "M4A4 | Asiimov",
+        "rarity": "Засекреченное",
+        "price": 2200,
+        "weight": 32
+      },
+      {
+        "name": "AK-47 | Wild Lotus",
+        "rarity": "Тайное",
+        "price": 5000,
+        "weight": 6
+      },
+      {
+        "name": "★ Karambit | Fade",
+        "rarity": "Редкий спецпредмет",
+        "price": 15000,
+        "weight": 1
+      }
     ]
   },
   {
@@ -79,14 +264,54 @@
     "min_level": 12,
     "xp": 25,
     "items": [
-      {"name": "AWP | Man-o'-war", "rarity": "Милитари", "price": 350, "weight": 800},
-      {"name": "M4A1-S | Decimator", "rarity": "Милитари", "price": 400, "weight": 800},
-      {"name": "AK-47 | Vulcan", "rarity": "Запрещённое", "price": 1200, "weight": 160},
-      {"name": "Desert Eagle | Blaze", "rarity": "Запрещённое", "price": 1100, "weight": 160},
-      {"name": "AWP | Neo-Noir", "rarity": "Засекреченное", "price": 2800, "weight": 32},
-      {"name": "M4A4 | Poseidon", "rarity": "Засекреченное", "price": 3000, "weight": 32},
-      {"name": "AK-47 | Fire Serpent", "rarity": "Тайное", "price": 8000, "weight": 6},
-      {"name": "★ Karambit | Doppler", "rarity": "Редкий спецпредмет", "price": 25000, "weight": 1}
+      {
+        "name": "AWP | Man-o'-war",
+        "rarity": "Милитари",
+        "price": 350,
+        "weight": 800
+      },
+      {
+        "name": "M4A1-S | Decimator",
+        "rarity": "Милитари",
+        "price": 400,
+        "weight": 800
+      },
+      {
+        "name": "AK-47 | Vulcan",
+        "rarity": "Запрещённое",
+        "price": 1200,
+        "weight": 160
+      },
+      {
+        "name": "Desert Eagle | Blaze",
+        "rarity": "Запрещённое",
+        "price": 1100,
+        "weight": 160
+      },
+      {
+        "name": "AWP | Neo-Noir",
+        "rarity": "Засекреченное",
+        "price": 2800,
+        "weight": 32
+      },
+      {
+        "name": "M4A4 | Poseidon",
+        "rarity": "Засекреченное",
+        "price": 3000,
+        "weight": 32
+      },
+      {
+        "name": "AK-47 | Fire Serpent",
+        "rarity": "Тайное",
+        "price": 8000,
+        "weight": 6
+      },
+      {
+        "name": "★ Karambit | Doppler",
+        "rarity": "Редкий спецпредмет",
+        "price": 25000,
+        "weight": 1
+      }
     ]
   },
   {
@@ -96,14 +321,54 @@
     "min_level": 18,
     "xp": 35,
     "items": [
-      {"name": "SG 553 | Cyrex", "rarity": "Милитари", "price": 500, "weight": 800},
-      {"name": "FAMAS | Djinn", "rarity": "Милитари", "price": 550, "weight": 800},
-      {"name": "AK-47 | Wasteland Rebel", "rarity": "Запрещённое", "price": 1700, "weight": 160},
-      {"name": "AWP | Redline", "rarity": "Запрещённое", "price": 1600, "weight": 160},
-      {"name": "M4A4 | The Emperor", "rarity": "Засекреченное", "price": 3800, "weight": 32},
-      {"name": "AWP | Hyper Beast", "rarity": "Засекреченное", "price": 4000, "weight": 32},
-      {"name": "AK-47 | Vulcan", "rarity": "Тайное", "price": 9500, "weight": 6},
-      {"name": "★ Karambit | Tiger Tooth", "rarity": "Редкий спецпредмет", "price": 35000, "weight": 1}
+      {
+        "name": "SG 553 | Cyrex",
+        "rarity": "Милитари",
+        "price": 500,
+        "weight": 800
+      },
+      {
+        "name": "FAMAS | Djinn",
+        "rarity": "Милитари",
+        "price": 550,
+        "weight": 800
+      },
+      {
+        "name": "AK-47 | Wasteland Rebel",
+        "rarity": "Запрещённое",
+        "price": 1700,
+        "weight": 160
+      },
+      {
+        "name": "AWP | Redline",
+        "rarity": "Запрещённое",
+        "price": 1600,
+        "weight": 160
+      },
+      {
+        "name": "M4A4 | The Emperor",
+        "rarity": "Засекреченное",
+        "price": 3800,
+        "weight": 32
+      },
+      {
+        "name": "AWP | Hyper Beast",
+        "rarity": "Засекреченное",
+        "price": 4000,
+        "weight": 32
+      },
+      {
+        "name": "AK-47 | Vulcan",
+        "rarity": "Тайное",
+        "price": 9500,
+        "weight": 6
+      },
+      {
+        "name": "★ Karambit | Tiger Tooth",
+        "rarity": "Редкий спецпредмет",
+        "price": 35000,
+        "weight": 1
+      }
     ]
   },
   {
@@ -113,14 +378,168 @@
     "min_level": 25,
     "xp": 50,
     "items": [
-      {"name": "AK-47 | Redline", "rarity": "Милитари", "price": 850, "weight": 800},
-      {"name": "M4A1-S | Hyper Beast", "rarity": "Милитари", "price": 900, "weight": 800},
-      {"name": "AWP | Lightning Strike", "rarity": "Запрещённое", "price": 2700, "weight": 160},
-      {"name": "Desert Eagle | Code Red", "rarity": "Запрещённое", "price": 2900, "weight": 160},
-      {"name": "AK-47 | Vulcan", "rarity": "Засекреченное", "price": 6200, "weight": 32},
-      {"name": "M4A4 | Dragon King", "rarity": "Засекреченное", "price": 6500, "weight": 32},
-      {"name": "★ Gloves | Crimson Kimono", "rarity": "Тайное", "price": 18000, "weight": 6},
-      {"name": "AWP | Dragon Lore", "rarity": "Редкий спецпредмет", "price": 80000, "weight": 1}
+      {
+        "name": "AK-47 | Redline",
+        "rarity": "Милитари",
+        "price": 850,
+        "weight": 800
+      },
+      {
+        "name": "M4A1-S | Hyper Beast",
+        "rarity": "Милитари",
+        "price": 900,
+        "weight": 800
+      },
+      {
+        "name": "AWP | Lightning Strike",
+        "rarity": "Запрещённое",
+        "price": 2700,
+        "weight": 160
+      },
+      {
+        "name": "Desert Eagle | Code Red",
+        "rarity": "Запрещённое",
+        "price": 2900,
+        "weight": 160
+      },
+      {
+        "name": "AK-47 | Vulcan",
+        "rarity": "Засекреченное",
+        "price": 6200,
+        "weight": 32
+      },
+      {
+        "name": "M4A4 | Dragon King",
+        "rarity": "Засекреченное",
+        "price": 6500,
+        "weight": 32
+      },
+      {
+        "name": "★ Gloves | Crimson Kimono",
+        "rarity": "Тайное",
+        "price": 18000,
+        "weight": 6
+      },
+      {
+        "name": "AWP | Dragon Lore",
+        "rarity": "Редкий спецпредмет",
+        "price": 80000,
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "mythic_case",
+    "name": "🟤 Мифический кейс",
+    "price": 50000,
+    "min_level": 30,
+    "xp": 90,
+    "items": [
+      {
+        "name": "P90 | Asiimov",
+        "rarity": "Милитари",
+        "price": 3500,
+        "weight": 400
+      },
+      {
+        "name": "MAC-10 | Neon Rider",
+        "rarity": "Милитари",
+        "price": 4000,
+        "weight": 400
+      },
+      {
+        "name": "AK-47 | Neon Rider",
+        "rarity": "Запрещённое",
+        "price": 12000,
+        "weight": 220
+      },
+      {
+        "name": "Desert Eagle | Printstream",
+        "rarity": "Запрещённое",
+        "price": 14000,
+        "weight": 220
+      },
+      {
+        "name": "M4A4 | Temukau",
+        "rarity": "Засекреченное",
+        "price": 26000,
+        "weight": 90
+      },
+      {
+        "name": "AWP | Gungnir",
+        "rarity": "Засекреченное",
+        "price": 32000,
+        "weight": 90
+      },
+      {
+        "name": "★ Butterfly Knife | Fade",
+        "rarity": "Тайное",
+        "price": 70000,
+        "weight": 30
+      },
+      {
+        "name": "★ Karambit | Tiger Tooth",
+        "rarity": "Редкий спецпредмет",
+        "price": 150000,
+        "weight": 6
+      }
+    ]
+  },
+  {
+    "id": "prestige_case",
+    "name": "⚜️ Престижный кейс",
+    "price": 150000,
+    "min_level": 40,
+    "xp": 160,
+    "items": [
+      {
+        "name": "Nova | Antique",
+        "rarity": "Милитари",
+        "price": 9000,
+        "weight": 250
+      },
+      {
+        "name": "Five-SeveN | Hyper Beast",
+        "rarity": "Милитари",
+        "price": 10000,
+        "weight": 250
+      },
+      {
+        "name": "AK-47 | Wild Lotus",
+        "rarity": "Запрещённое",
+        "price": 35000,
+        "weight": 160
+      },
+      {
+        "name": "M4A1-S | Player Two",
+        "rarity": "Запрещённое",
+        "price": 40000,
+        "weight": 160
+      },
+      {
+        "name": "AWP | Fade",
+        "rarity": "Засекреченное",
+        "price": 90000,
+        "weight": 70
+      },
+      {
+        "name": "★ Sport Gloves | Vice",
+        "rarity": "Засекреченное",
+        "price": 110000,
+        "weight": 70
+      },
+      {
+        "name": "★ M9 Bayonet | Doppler (Ruby)",
+        "rarity": "Тайное",
+        "price": 260000,
+        "weight": 25
+      },
+      {
+        "name": "★ Karambit | Case Hardened (Blue Gem)",
+        "rarity": "Редкий спецпредмет",
+        "price": 600000,
+        "weight": 8
+      }
     ]
   }
 ]

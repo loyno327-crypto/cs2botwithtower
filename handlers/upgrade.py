@@ -32,6 +32,13 @@ def _fmt_mult(mult) -> str:
     return f"x{mult:g}"
 
 
+def _upgradeable_items(user_id: int):
+    """Инвентарь без защищённых предметов — защищённые (is_protected = 1)
+    нельзя использовать в апгрейде вообще, поэтому их не показываем
+    в списке выбора."""
+    return [i for i in db.get_inventory(user_id) if not i["is_protected"]]
+
+
 def _page_slice(items, page: int):
     per_page = config.ITEMS_PER_PAGE
     total_pages = max(1, (len(items) + per_page - 1) // per_page)
@@ -96,7 +103,7 @@ def _pick_text(items, selected: list[int], page: int) -> str:
 @router.message(F.text == "🛠 Апгрейд")
 async def start_upgrade(message: Message):
     user_id = message.from_user.id
-    items = db.get_inventory(user_id)
+    items = _upgradeable_items(user_id)
     if not items:
         await message.answer("📦 Инвентарь пуст — сначала открой кейс, апгрейдить нечего.")
         return
@@ -121,7 +128,7 @@ async def change_page(callback: CallbackQuery):
     state = upgrade_state.setdefault(user_id, {"selected": [], "page": 0})
     state["page"] = page
 
-    items = db.get_inventory(user_id)
+    items = _upgradeable_items(user_id)
     await callback.message.edit_text(
         _pick_text(items, state["selected"], page),
         reply_markup=pick_keyboard(items, state["selected"], page)
@@ -140,6 +147,9 @@ async def toggle_item(callback: CallbackQuery):
     if not item:
         await callback.answer("Предмет не найден.", show_alert=True)
         return
+    if item["is_protected"]:
+        await callback.answer("🔒 Предмет защищён — сначала сними защиту в Инвентаре.", show_alert=True)
+        return
 
     state = upgrade_state.setdefault(user_id, {"selected": [], "page": page})
     selected = state["selected"]
@@ -155,7 +165,7 @@ async def toggle_item(callback: CallbackQuery):
         selected.append(item_id)
     state["page"] = page
 
-    items = db.get_inventory(user_id)
+    items = _upgradeable_items(user_id)
     await callback.message.edit_text(
         _pick_text(items, selected, page),
         reply_markup=pick_keyboard(items, selected, page)
@@ -172,7 +182,7 @@ async def continue_upgrade(callback: CallbackQuery):
         return
 
     items = [db.get_item_by_id(item_id, user_id) for item_id in selected]
-    items = [i for i in items if i is not None]
+    items = [i for i in items if i is not None and not i["is_protected"]]
     if not items:
         await callback.answer("Выбранные предметы больше недоступны.", show_alert=True)
         return
@@ -209,7 +219,7 @@ async def do_upgrade(callback: CallbackQuery):
         return
 
     items = [db.get_item_by_id(item_id, user_id) for item_id in selected]
-    items = [i for i in items if i is not None]
+    items = [i for i in items if i is not None and not i["is_protected"]]
     if not items:
         await callback.answer("Выбранные предметы больше недоступны.", show_alert=True)
         return

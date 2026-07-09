@@ -165,7 +165,23 @@
   .quick-card .icon{font-size:22px; display:block; margin-bottom:4px;}
   .quick-card .name{font-size:13px; font-weight:600;}
 
-  /* ---- Игры: список разделов ---- */
+  /* ---- Игры: горизонтальный ряд кнопок (Crash / Апгрейд / Слоты / Кейсы) ---- */
+  .game-row{
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:4px;
+  }
+  .game-tile{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:14px 4px 10px; text-align:center; cursor:pointer; transition:.15s;
+    border-top:2px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:5px;
+  }
+  .game-tile:active{background:var(--panel-2); transform:scale(.97);}
+  .game-tile.crash{border-top-color:var(--red);}
+  .game-tile.upgrade{border-top-color:var(--purple);}
+  .game-tile.slots{border-top-color:var(--amber);}
+  .game-tile.cases{border-top-color:var(--green);}
+  .game-tile .icon{font-size:24px; line-height:1;}
+  .game-tile .name{font-size:11.5px; font-weight:600; line-height:1.2;}
+
   .game-card{
     background:var(--panel); border:1px solid var(--line); border-radius:6px;
     padding:16px; margin-bottom:10px; display:flex; align-items:center; gap:14px;
@@ -265,6 +281,53 @@
     text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
     margin-top:6px; padding-bottom:4px;
   }
+  .case-open-btn{
+    width:100%; padding:11px; border:none; border-radius:5px; cursor:pointer; margin-top:4px;
+    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:13px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .case-open-btn:disabled{opacity:.5;}
+  .case-locked-note{
+    text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+    margin-top:4px;
+  }
+
+  /* ---- Результат открытия кейса / покупки (оверлей) ---- */
+  .drop-overlay{
+    position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+    background:rgba(6,7,4,0.82); padding:24px; animation:fadein .2s ease;
+  }
+  .drop-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:26px 20px; text-align:center; max-width:320px; width:100%;
+    border-top:3px solid var(--amber);
+  }
+  .drop-card .drop-emoji{font-size:34px; margin-bottom:8px;}
+  .drop-card .drop-name{font-size:17px; font-weight:700; margin-bottom:4px;}
+  .drop-card .drop-rarity{font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:10px;}
+  .drop-card .drop-price{font-family:var(--mono); font-size:20px; color:var(--amber); font-weight:700; margin-bottom:16px;}
+  .drop-card .drop-close-btn{
+    width:100%; padding:12px; border:none; border-radius:6px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-weight:700; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:.5px;
+  }
+
+  /* ---- Магазин ---- */
+  .shop-item-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:14px; margin-bottom:10px; border-left:3px solid var(--purple);
+  }
+  .shop-item-card.locked{opacity:.55;}
+  .shop-item-name{font-size:14.5px; font-weight:600;}
+  .shop-item-rarity{font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:2px;}
+  .shop-item-row{display:flex; align-items:center; justify-content:space-between; margin-top:10px; gap:10px;}
+  .shop-item-price{font-family:var(--mono); color:var(--amber); font-weight:700; font-size:14px;}
+  .shop-buy-btn{
+    padding:9px 16px; border:none; border-radius:5px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-weight:700; font-size:12.5px;
+    text-transform:uppercase; letter-spacing:.5px; flex-shrink:0;
+  }
+  .shop-buy-btn:disabled{opacity:.5;}
 
   /* ---- Инвентарь ---- */
   .item-row{
@@ -277,15 +340,23 @@
   .item-row.rarity-zasekrechennoe{border-left-color:var(--pink);}
   .item-row.rarity-taynoe{border-left-color:var(--red);}
   .item-row.rarity-redkiy{border-left-color:var(--amber);}
+  .item-row.protected{border-left-color:var(--green); background:var(--panel-2);}
   .item-name{font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .item-rarity{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px;}
-  .item-right{display:flex; align-items:center; gap:10px; flex-shrink:0;}
+  .item-right{display:flex; align-items:center; gap:8px; flex-shrink:0;}
   .item-price{font-family:var(--mono); font-size:13px; color:var(--amber); white-space:nowrap;}
   .lock-btn{
-    width:26px; height:26px; border-radius:4px; border:1px solid var(--line); background:var(--panel-2);
-    color:var(--text-dim); font-size:12px; display:flex; align-items:center; justify-content:center;
-    opacity:.45; flex-shrink:0;
+    width:28px; height:28px; border-radius:4px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--text-dim); font-size:13px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; cursor:pointer;
   }
+  .lock-btn.on{border-color:var(--green); color:var(--green); background:rgba(127,174,63,.12);}
+  .sell-btn{
+    width:28px; height:28px; border-radius:4px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--text-dim); font-size:13px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; cursor:pointer;
+  }
+  .sell-btn:disabled{opacity:.3; cursor:default;}
   .inv-summary{
     display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px;
     color:var(--text-dim); margin-bottom:10px; padding:0 2px;
@@ -354,7 +425,7 @@
 <header class="hud">
   <div class="hud-top">
     <div class="brand"><span class="status-dot"></span><b>WEB APP</b> // ONLINE</div>
-    <div class="brand" id="stage-tag">STAGE 1</div>
+    <div class="brand" id="stage-tag">STAGE 2</div>
   </div>
 
   <div class="profile-card" id="profile-card">
@@ -381,14 +452,13 @@
 
     <div class="section-title spaced">Что дальше</div>
     <div class="roadmap-panel">
-      <span class="tag">Этап 1</span><br>
-      Структура Web App обновлена под витрину бота: <b>Игры</b> (Crash,
-      Апгрейд, Слоты), отдельные <b>Кейсы</b> и <b>Магазин</b>, защита
-      предметов в <b>Инвентаре</b> и раздел <b>Топ</b>. Режим "Оборона"
-      снят с разработки — вся игровая логика дальше переносится из
-      бота напрямую сюда.<br><br>
-      Дальше по плану: сам перенос игр в разделе <b>Игры</b>, затем
-      экономика кейсов/магазина, затем топы и единый визуальный стиль.
+      <span class="tag">Этап 2</span><br>
+      Готово: <b>Crash</b> с реальным сервером и плавной анимацией, <b>Кейсы</b>
+      открываются прямо в Web App (включая новые дорогие кейсы), <b>Магазин</b>
+      за монеты, защита предметов в <b>Инвентаре</b> и три живых рейтинга
+      в <b>Топе</b> — все данные общие с ботом.<br><br>
+      Дальше по плану (Этап 3): перенос <b>Апгрейда</b> и <b>Слотов</b> прямо
+      в раздел «Игры» с анимациями, финальная полировка визуального стиля.
     </div>
   </div>
 
@@ -397,31 +467,23 @@
     <div id="games-list">
       <div class="section-title">Игры</div>
 
-      <div class="game-card crash" data-game="crash">
-        <span class="icon">📈</span>
-        <div class="info">
+      <div class="game-row">
+        <div class="game-tile crash" data-game="crash">
+          <span class="icon">📈</span>
           <div class="name">Crash</div>
-          <div class="desc">Коэффициент растёт в реальном времени — забери выигрыш до краша.</div>
         </div>
-        <span class="arrow">›</span>
-      </div>
-
-      <div class="game-card upgrade" data-game="upgrade">
-        <span class="icon">⚡</span>
-        <div class="info">
+        <div class="game-tile upgrade" data-game="upgrade">
+          <span class="icon">⚡</span>
           <div class="name">Апгрейд</div>
-          <div class="desc">Улучшай предметы из инвентаря с шансом на успех.</div>
         </div>
-        <span class="arrow">›</span>
-      </div>
-
-      <div class="game-card slots" data-game="slots">
-        <span class="icon">🎰</span>
-        <div class="info">
+        <div class="game-tile slots" data-game="slots">
+          <span class="icon">🎰</span>
           <div class="name">Слоты</div>
-          <div class="desc">Классические слоты на игровые монеты.</div>
         </div>
-        <span class="arrow">›</span>
+        <div class="game-tile cases" data-goto-tab="cases">
+          <span class="icon">📦</span>
+          <div class="name">Кейсы</div>
+        </div>
       </div>
     </div>
 
@@ -456,12 +518,8 @@
   <!-- МАГАЗИН -->
   <div class="view" id="view-shop">
     <div class="section-title">Магазин</div>
-    <div class="placeholder-panel">
-      <span class="big">🛒</span>
-      Магазин за игровые монеты в разработке.<br>
-      Здесь появятся эксклюзивные предметы, которые нельзя получить
-      из кейсов или которые выпадают с крайне низкой вероятностью.
-      <div class="stage-note">Этап 2</div>
+    <div id="shop-list">
+      <div class="loading-line">загрузка магазина…</div>
     </div>
   </div>
 
@@ -552,10 +610,12 @@
   }
 
   // ---------- Шапка профиля ----------
+  let meData = null;
   async function loadProfile() {
     const card = document.getElementById('profile-card');
     try {
       const data = await apiGet('/api/me');
+      meData = data;
       const initials = (data.username || '?').slice(0, 2).toUpperCase();
       const xpPercent = data.xp_needed ? Math.min(100, Math.round((data.xp / data.xp_needed) * 100)) : 0;
 
@@ -649,9 +709,13 @@
     gamesDetailEl.classList.remove('hidden');
   }
 
-  document.querySelectorAll('.game-card').forEach(card => {
+  document.querySelectorAll('.game-tile').forEach(card => {
     card.addEventListener('click', () => {
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      if (card.dataset.gotoTab) {
+        goToTab(card.dataset.gotoTab);
+        return;
+      }
       openGame(card.dataset.game);
     });
   });
@@ -706,6 +770,17 @@
     if (elapsedSeconds <= 0) return 1;
     const ticks = elapsedSeconds / crashCfg.tickSeconds;
     return Math.pow(1 + crashCfg.growthPerTick, ticks);
+  }
+
+  // Обратная функция: по множителю находим, сколько секунд должно было
+  // пройти, чтобы получить именно такое значение. Нужна для ресинхронизации
+  // локальной анимации с "настоящим" (серверным) множителем — без этого
+  // при небольшом расхождении часов устройства с сервером число на экране
+  // могло медленно уплывать от реального значения, на которое рассчитывается
+  // выплата при кэшауте.
+  function elapsedForMultiplier(mult) {
+    if (mult <= 1) return 0;
+    return crashCfg.tickSeconds * Math.log(mult) / Math.log(1 + crashCfg.growthPerTick);
   }
 
   // "Одометр": перерисовываем только те символы, которые реально
@@ -814,6 +889,13 @@
           crashRound = null;
           stopCrashLoops();
           renderBettingPanel();
+        } else if (typeof state.multiplier === 'number') {
+          // Ресинхронизация: пересчитываем "виртуальный" startTime так,
+          // чтобы локальная формула в эту секунду выдавала ровно то
+          // значение, которое подтвердил сервер — реальный x, без
+          // накопленного расхождения из-за часов устройства.
+          const realElapsed = elapsedForMultiplier(state.multiplier);
+          crashRound.startTime = Date.now() - realElapsed * 1000;
         }
       } catch (e) {
         // сеть моргнула — подождём следующего поллинга
@@ -904,12 +986,67 @@
 
   // ---------- Кейсы ----------
   let casesLoaded = false;
+  function showDropOverlay(item, extraNote) {
+    const emoji = {
+      'Милитари': '🔵', 'Запрещённое': '🟪', 'Засекреченное': '🌸',
+      'Тайное': '🔴', 'Редкий спецпредмет': '🟡',
+    }[item.rarity] || '◽';
+    const overlay = document.createElement('div');
+    overlay.className = 'drop-overlay';
+    overlay.innerHTML = `
+      <div class="drop-card">
+        <div class="drop-emoji">${emoji}</div>
+        <div class="drop-name">${escapeHtml(item.name)}</div>
+        <div class="drop-rarity">${escapeHtml(item.rarity)}</div>
+        <div class="drop-price">${fmt(item.price)} монет</div>
+        ${extraNote ? `<div class="shop-hint" style="margin-bottom:12px;">${extraNote}</div>` : ''}
+        <button class="drop-close-btn">Забрать</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.drop-close-btn').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  async function openCase(caseId, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/cases/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ case_id: caseId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error === 'insufficient_balance' ? `Недостаточно монет (нужно ${fmt(data.price)}).`
+          : data.error === 'level_too_low' ? `Кейс откроется с ${data.min_level} уровня.`
+          : 'Не удалось открыть кейс, попробуй ещё раз.';
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+        alert(msg);
+        return;
+      }
+      showDropOverlay(data.item, `+${data.xp_gained} XP · заплачено ${fmt(data.price_paid)} монет`);
+      loadProfile();
+      statsCache = null;
+      inventoryLoaded = false;
+    } catch (e) {
+      alert('Нет связи с сервером.');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async function renderCases() {
-    if (casesLoaded) return;
     const el = document.getElementById('cases-list');
+    el.innerHTML = `<div class="loading-line">загрузка кейсов…</div>`;
     try {
       const data = await apiGet('/api/shop/cases');
-      const cardsHtml = data.cases.map(c => `
+      const level = meData?.level ?? 1;
+      const cardsHtml = data.cases.map(c => {
+        const locked = level < c.min_level;
+        return `
         <div class="case-card">
           <div class="case-head">
             <div class="case-name">${escapeHtml(c.name)}</div>
@@ -919,39 +1056,153 @@
           <div class="chip-row">
             ${c.sample_items.map(i => `<span class="chip">${escapeHtml(i.name)} <b>${fmt(i.price)}</b></span>`).join('')}
           </div>
+          ${locked
+            ? `<div class="case-locked-note">🔒 Открывается с ${c.min_level} уровня (у тебя ${level})</div>`
+            : `<button class="case-open-btn" data-case="${c.id}">🔓 Открыть за ${fmt(c.price)}</button>`}
         </div>
-      `).join('');
-      el.innerHTML = cardsHtml + `<div class="shop-hint">Открытие кейсов пока доступно в самом боте (/cases) — прямое открытие из Web App появится на следующем этапе.</div>`;
+      `;
+      }).join('');
+      el.innerHTML = cardsHtml;
+      el.querySelectorAll('.case-open-btn').forEach(btn => {
+        btn.addEventListener('click', () => openCase(btn.dataset.case, btn));
+      });
       casesLoaded = true;
     } catch (e) {
       el.innerHTML = `<div class="error-line">не удалось загрузить кейсы</div>`;
     }
   }
 
-  // ---------- Инвентарь ----------
+  // ---------- Магазин ----------
+  async function buyShopItem(itemId, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/shop/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ item_id: itemId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error === 'insufficient_balance' ? 'Недостаточно монет для этой покупки.'
+          : data.error === 'level_too_low' ? `Предмет откроется с ${data.min_level} уровня.`
+          : 'Не удалось купить, попробуй ещё раз.';
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+        alert(msg);
+        return;
+      }
+      showDropOverlay(data.item, 'Куплено в магазине');
+      loadProfile();
+      statsCache = null;
+      inventoryLoaded = false;
+    } catch (e) {
+      alert('Нет связи с сервером.');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function renderShop() {
+    const el = document.getElementById('shop-list');
+    el.innerHTML = `<div class="loading-line">загрузка магазина…</div>`;
+    try {
+      const data = await apiGet('/api/shop/items');
+      if (!data.items.length) {
+        el.innerHTML = `<div class="placeholder-panel"><span class="big">🛒</span>Ассортимент магазина пока пуст.</div>`;
+        return;
+      }
+      el.innerHTML = `<div class="shop-hint" style="margin-bottom:10px;">Эксклюзивные предметы — не выпадают из кейсов или выпадают крайне редко.</div>` +
+        data.items.map(i => `
+          <div class="shop-item-card ${i.unlocked ? '' : 'locked'}">
+            <div class="shop-item-name">${escapeHtml(i.name)}</div>
+            <div class="shop-item-rarity">${escapeHtml(i.rarity)}</div>
+            <div class="shop-item-row">
+              <div class="shop-item-price">${fmt(i.price)} монет</div>
+              ${i.unlocked
+                ? `<button class="shop-buy-btn" data-item="${i.id}">Купить</button>`
+                : `<div class="case-locked-note" style="margin:0;">🔒 с ${i.min_level} ур.</div>`}
+            </div>
+          </div>
+        `).join('');
+      el.querySelectorAll('.shop-buy-btn').forEach(btn => {
+        btn.addEventListener('click', () => buyShopItem(btn.dataset.item, btn));
+      });
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить магазин</div>`;
+    }
+  }
   let inventoryLoaded = false;
+  async function toggleProtect(itemId, nextState, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/inventory/protect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ item_id: Number(itemId), protected: nextState }),
+      });
+      if (!res.ok) throw new Error('failed');
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      inventoryLoaded = false;
+      renderInventory();
+    } catch (e) {
+      alert('Не удалось изменить защиту предмета.');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function sellItem(itemId, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/inventory/sell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ item_id: Number(itemId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error === 'item_protected' ? 'Предмет защищён — сначала сними защиту.' : 'Не удалось продать предмет.');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      loadProfile();
+      statsCache = null;
+      inventoryLoaded = false;
+      renderInventory();
+    } catch (e) {
+      alert('Нет связи с сервером.');
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async function renderInventory() {
     if (inventoryLoaded) return;
     const el = document.getElementById('inventory-list');
     try {
       const data = await apiGet('/api/inventory');
       if (data.items.length === 0) {
-        el.innerHTML = `<div class="placeholder-panel"><span class="big">🎒</span>Инвентарь пуст.<br>Открой кейс в боте, чтобы получить первый предмет.</div>`;
+        el.innerHTML = `<div class="placeholder-panel"><span class="big">🎒</span>Инвентарь пуст.<br>Открой кейс, чтобы получить первый предмет.</div>`;
       } else {
         const summary = `<div class="inv-summary"><span>Предметов: <b>${data.count}</b></span><span>Стоимость: <b>${fmt(data.total_value)}</b></span></div>`;
         const rows = data.items.map(i => `
-          <div class="item-row ${rarityClass(i.rarity)}">
+          <div class="item-row ${rarityClass(i.rarity)} ${i.protected ? 'protected' : ''}">
             <div>
               <div class="item-name">${escapeHtml(i.name)}</div>
               <div class="item-rarity">${escapeHtml(i.rarity)}</div>
             </div>
             <div class="item-right">
               <div class="item-price">${fmt(i.price)}</div>
-              <div class="lock-btn" title="Защита предмета появится на Этапе 2">🔓</div>
+              <button class="lock-btn ${i.protected ? 'on' : ''}" data-action="protect" data-id="${i.id}" data-next="${i.protected ? '0' : '1'}" title="${i.protected ? 'Снять защиту' : 'Защитить предмет'}">${i.protected ? '🔒' : '🔓'}</button>
+              <button class="sell-btn" data-action="sell" data-id="${i.id}" ${i.protected ? 'disabled' : ''} title="Продать">💸</button>
             </div>
           </div>
         `).join('');
         el.innerHTML = summary + rows;
+        el.querySelectorAll('[data-action="protect"]').forEach(btn => {
+          btn.addEventListener('click', () => toggleProtect(btn.dataset.id, btn.dataset.next === '1', btn));
+        });
+        el.querySelectorAll('[data-action="sell"]').forEach(btn => {
+          btn.addEventListener('click', () => sellItem(btn.dataset.id, btn));
+        });
       }
       inventoryLoaded = true;
     } catch (e) {
@@ -998,13 +1249,34 @@
   }
 
   // ---------- Топ ----------
-  // Этап 1: только переключатель между тремя рейтингами (визуально).
-  // Реальные данные подключаются к общей базе бота на Этапе 3.
+  async function renderTop(type) {
+    const el = document.getElementById('top-list');
+    el.innerHTML = `<div class="loading-line">загрузка рейтинга…</div>`;
+    try {
+      const data = await apiGet('/api/top?type=' + encodeURIComponent(type));
+      if (!data.entries.length) {
+        el.innerHTML = `<div class="placeholder-panel"><span class="big">🏆</span>Рейтинг пока пуст.</div>`;
+        return;
+      }
+      const valueSuffix = type === 'coins' ? ' монет' : type === 'level' ? ' ур.' : '';
+      el.innerHTML = data.entries.map((e, idx) => `
+        <div class="top-row">
+          <div class="top-rank">${idx + 1}</div>
+          <div class="top-name">${escapeHtml(e.name)}${e.sub ? ` <span style="color:var(--text-dim); font-weight:400;">· ${escapeHtml(e.sub)}</span>` : ''}</div>
+          <div class="top-val">${fmt(e.value)}${valueSuffix}</div>
+        </div>
+      `).join('');
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить топ</div>`;
+    }
+  }
+
   document.querySelectorAll('#top-switch button').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#top-switch button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      renderTop(btn.dataset.top);
     });
   });
 
@@ -1013,10 +1285,10 @@
     home: renderHome,
     games: resetGamesView,
     cases: renderCases,
-    shop: () => {},
+    shop: renderShop,
     inventory: renderInventory,
     profile: renderProfileTab,
-    top: () => {},
+    top: () => renderTop('coins'),
   };
 
   function goToTab(tabId) {

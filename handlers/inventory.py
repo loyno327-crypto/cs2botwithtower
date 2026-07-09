@@ -41,31 +41,39 @@ def _page_slice(items, page: int):
 
 def inventory_text(items, page_items, page: int, total_pages: int) -> str:
     total_value = sum(item["item_price"] for item in items)
+    protected_count = sum(1 for item in items if item["is_protected"])
 
     lines = ["📦 <b>Твой инвентарь:</b>\n"]
     for item in page_items:
         emoji = RARITY_EMOJI.get(item["item_rarity"], "◽")
+        lock = "🔒 " if item["is_protected"] else ""
         lines.append(
-            f"{emoji} {item['item_name']} ({item['item_rarity']}) — {item['item_price']} монет"
+            f"{lock}{emoji} {item['item_name']} ({item['item_rarity']}) — {item['item_price']} монет"
         )
 
     lines.append(f"\n💰 Общая стоимость инвентаря: <b>{total_value}</b> монет")
     lines.append(f"Продажа возвращает {int(config.SELL_PERCENT * 100)}% от стоимости предмета.")
+    if protected_count:
+        lines.append(f"🔒 Защищено предметов: {protected_count} (не продаются и не участвуют в апгрейде).")
     if total_pages > 1:
         lines.append(f"\nСтраница {page + 1} из {total_pages}")
     return "\n".join(lines)
 
 
 def inventory_keyboard(items, page_items, page: int, total_pages: int) -> InlineKeyboardMarkup:
-    buttons = [
-        [
-            InlineKeyboardButton(
+    buttons = []
+    for item in page_items:
+        protected = bool(item["is_protected"])
+        lock_text = "🔓 Снять защиту" if protected else "🔒 Защитить"
+        buttons.append([InlineKeyboardButton(
+            text=f"{lock_text}: {item['item_name']}",
+            callback_data=f"toggle_protect:{item['id']}:{page}"
+        )])
+        if not protected:
+            buttons.append([InlineKeyboardButton(
                 text=f"💸 Продать {item['item_name']} — {sell_price(item['item_price'])} монет",
                 callback_data=f"sell_item:{item['id']}:{page}"
-            )
-        ]
-        for item in page_items
-    ]
+            )])
 
     if total_pages > 1:
         nav_row = []
@@ -76,8 +84,8 @@ def inventory_keyboard(items, page_items, page: int, total_pages: int) -> Inline
             nav_row.append(InlineKeyboardButton(text="След. ➡️", callback_data=f"inv_page:{page + 1}"))
         buttons.append(nav_row)
 
-    if items:
-        buttons.append([InlineKeyboardButton(text="🗑 Продать всё", callback_data="sell_all")])
+    if any(not item["is_protected"] for item in items):
+        buttons.append([InlineKeyboardButton(text="🗑 Продать всё (кроме защищённых)", callback_data="sell_all")])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -124,6 +132,26 @@ async def change_page(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("toggle_protect:"))
+async def toggle_protect(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    parts = callback.data.split(":")
+    item_id = int(parts[1])
+    page = int(parts[2]) if len(parts) > 2 else 0
+
+    item = db.get_item_by_id(item_id, user_id)
+    if not item:
+        await callback.answer("Предмет не найден.", show_alert=True)
+        return
+
+    new_state = not bool(item["is_protected"])
+    db.set_item_protected(item_id, user_id, new_state)
+    await callback.answer("🔒 Предмет защищён." if new_state else "🔓 Защита снята.")
+
+    items, text, keyboard = await _render_inventory(user_id, page)
+    await callback.message.edit_text(text, reply_markup=keyboard)
+
+
 @router.callback_query(F.data.startswith("sell_item:"))
 async def sell_item(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -134,6 +162,10 @@ async def sell_item(callback: CallbackQuery):
     item = db.get_item_by_id(item_id, user_id)
     if not item:
         await callback.answer("Предмет не найден — возможно, уже продан.", show_alert=True)
+        return
+
+    if item["is_protected"]:
+        await callback.answer("🔒 Предмет защищён — сначала сними защиту.", show_alert=True)
         return
 
     price = sell_price(item["item_price"])
@@ -156,19 +188,24 @@ async def sell_item(callback: CallbackQuery):
 async def sell_all(callback: CallbackQuery):
     user_id = callback.from_user.id
     items = db.get_inventory(user_id)
+    sellable = [i for i in items if not i["is_protected"]]
 
-    if not items:
-        await callback.answer("Инвентарь уже пуст.", show_alert=True)
+    if not sellable:
+        await callback.answer("Нет предметов для продажи (всё защищено или инвентарь пуст).", show_alert=True)
         return
 
-    total_price = sum(sell_price(item["item_price"]) for item in items)
-    count = len(items)
+    total_price = sum(sell_price(item["item_price"]) for item in sellable)
+    count = len(sellable)
 
-    db.remove_all_items(user_id)
+    db.remove_all_items(user_id)  # защищённые предметы не удаляются
     db.add_balance(user_id, total_price)
 
-    await callback.message.edit_text(
-        f"🗑 Продано {count} шт. предметов на общую сумму <b>{total_price}</b> монет.\n\n"
-        f"📦 Твой инвентарь пуст. Открой кейс, чтобы получить первые предметы!"
-    )
+    remaining = len(items) - count
+    text = f"🗑 Продано {count} шт. предметов на общую сумму <b>{total_price}</b> монет.\n\n"
+    if remaining:
+        text += f"🔒 {remaining} защищённых предметов оставлены в инвентаре."
+    else:
+        text += "📦 Твой инвентарь пуст. Открой кейс, чтобы получить первые предметы!"
+
+    await callback.message.edit_text(text)
     await callback.answer(f"✅ Продано всё за {total_price} монет!")

@@ -25,6 +25,7 @@ from aiohttp import web
 import config
 import database as db
 from handlers.crash import generate_crash_point
+from handlers import cases as cases_handlers
 
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -229,6 +230,7 @@ async def handle_inventory(request: web.Request) -> web.Response:
             "rarity": row["item_rarity"],
             "price": row["item_price"],
             "obtained_at": row["obtained_at"],
+            "protected": bool(row["is_protected"]),
         }
         for row in rows
     ]
@@ -316,6 +318,199 @@ async def handle_shop_cases(request: web.Request) -> web.Response:
         })
 
     return web.json_response({"cases": preview})
+
+
+async def handle_cases_open(request: web.Request) -> web.Response:
+    """Открывает кейс прямо из Web App — та же самая логика (шансы,
+    списание баланса, XP, скидка по уровню), что использует бот в
+    handlers/cases.py (roll_item / case_discounted_price импортированы
+    оттуда напрямую, чтобы гарантированно не разойтись с ботом)."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    case_id = payload.get("case_id")
+    case = cases_handlers.CASES_BY_ID.get(case_id)
+    if not case:
+        return web.json_response({"error": "case_not_found"}, status=404)
+
+    level_info = db.get_level_info(user_id)
+    level = level_info["level"]
+    min_level = cases_handlers.case_min_level(case)
+    if level < min_level:
+        return web.json_response({"error": "level_too_low", "min_level": min_level}, status=400)
+
+    price = cases_handlers.case_discounted_price(case, level)
+    balance = db.get_balance(user_id)
+    if balance < price:
+        return web.json_response({"error": "insufficient_balance", "price": price}, status=400)
+
+    db.add_balance(user_id, -price)
+    item = cases_handlers.roll_item(case)
+    item_id = db.add_item(user_id, item["name"], item["rarity"], item["price"])
+    db.increment_stat(user_id, "cases_opened")
+    xp_reward = cases_handlers.case_xp_reward(case)
+    xp_result = db.add_xp(user_id, xp_reward)
+
+    return web.json_response({
+        "item": {"id": item_id, "name": item["name"], "rarity": item["rarity"], "price": item["price"]},
+        "price_paid": price,
+        "xp_gained": xp_reward,
+        "balance": db.get_balance(user_id),
+        "level_info": xp_result,
+    })
+
+
+async def handle_shop_items(request: web.Request) -> web.Response:
+    """Отдаёт список эксклюзивных предметов магазина (config.SHOP_ITEMS) —
+    их нельзя получить из кейсов, только купить напрямую за монеты."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    level = db.get_level_info(user_id)["level"]
+
+    items = [
+        {**item, "unlocked": level >= item["min_level"]}
+        for item in config.SHOP_ITEMS
+    ]
+    return web.json_response({"items": items, "level": level})
+
+
+async def handle_shop_buy(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    item_id = payload.get("item_id")
+    shop_item = next((i for i in config.SHOP_ITEMS if i["id"] == item_id), None)
+    if not shop_item:
+        return web.json_response({"error": "item_not_found"}, status=404)
+
+    level = db.get_level_info(user_id)["level"]
+    if level < shop_item["min_level"]:
+        return web.json_response({"error": "level_too_low", "min_level": shop_item["min_level"]}, status=400)
+
+    balance = db.get_balance(user_id)
+    if balance < shop_item["price"]:
+        return web.json_response({"error": "insufficient_balance"}, status=400)
+
+    db.add_balance(user_id, -shop_item["price"])
+    new_item_id = db.add_item(user_id, shop_item["name"], shop_item["rarity"], shop_item["price"])
+
+    return web.json_response({
+        "item": {"id": new_item_id, "name": shop_item["name"], "rarity": shop_item["rarity"], "price": shop_item["price"]},
+        "balance": db.get_balance(user_id),
+    })
+
+
+async def handle_inventory_protect(request: web.Request) -> web.Response:
+    """Ставит/снимает защиту с предмета инвентаря (см. database.set_item_protected).
+    Защищённый предмет нельзя продать/апгрейднуть ни из Web App, ни из бота —
+    проверка идёт на уровне БД/хендлеров с обеих сторон."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    try:
+        item_id = int(payload.get("item_id"))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "invalid_item_id"}, status=400)
+
+    protected = bool(payload.get("protected"))
+    ok = db.set_item_protected(item_id, user_id, protected)
+    if not ok:
+        return web.json_response({"error": "item_not_found"}, status=404)
+
+    return web.json_response({"item_id": item_id, "protected": protected})
+
+
+async def handle_inventory_sell(request: web.Request) -> web.Response:
+    """Продаёт один предмет инвентаря из Web App (та же формула SELL_PERCENT,
+    что и в боте) — защищённые предметы продать нельзя."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    try:
+        item_id = int(payload.get("item_id"))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "invalid_item_id"}, status=400)
+
+    item = db.get_item_by_id(item_id, user_id)
+    if not item:
+        return web.json_response({"error": "item_not_found"}, status=404)
+    if item["is_protected"]:
+        return web.json_response({"error": "item_protected"}, status=400)
+
+    price = max(1, int(item["item_price"] * config.SELL_PERCENT))
+    db.remove_item(item_id, user_id)
+    db.add_balance(user_id, price)
+
+    return web.json_response({"sold_for": price, "balance": db.get_balance(user_id)})
+
+
+async def handle_top(request: web.Request) -> web.Response:
+    """Три рейтинга (монеты / уровень / самый дорогой дроп), читают ту же
+    общую базу, что и раздел «🏆 Топ» в боте (handlers/top.py)."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    top_type = request.query.get("type", "coins")
+
+    if top_type == "level":
+        rows = db.get_top_users_by_level(10)
+        entries = [
+            {"name": r["username"] or f"id{r['user_id']}", "value": r["level"], "sub": f"{r['xp']} XP"}
+            for r in rows
+        ]
+    elif top_type == "item":
+        rows = db.get_top_drops(10)
+        entries = [
+            {"name": r["username"] or f"id{r['user_id']}", "value": r["item_price"], "sub": r["item_name"]}
+            for r in rows
+        ]
+    else:
+        top_type = "coins"
+        rows = db.get_top_users(10)
+        entries = [
+            {"name": r["username"] or f"id{r['user_id']}", "value": r["balance"], "sub": None}
+            for r in rows
+        ]
+
+    return web.json_response({"type": top_type, "entries": entries})
 
 
 async def handle_battle_config(request: web.Request) -> web.Response:
@@ -549,6 +744,12 @@ def create_app() -> web.Application:
     app.router.add_get("/api/inventory", handle_inventory)
     app.router.add_get("/api/stats", handle_stats)
     app.router.add_get("/api/shop/cases", handle_shop_cases)
+    app.router.add_post("/api/cases/open", handle_cases_open)
+    app.router.add_get("/api/shop/items", handle_shop_items)
+    app.router.add_post("/api/shop/buy", handle_shop_buy)
+    app.router.add_post("/api/inventory/protect", handle_inventory_protect)
+    app.router.add_post("/api/inventory/sell", handle_inventory_sell)
+    app.router.add_get("/api/top", handle_top)
     app.router.add_get("/api/battle/config", handle_battle_config)
     app.router.add_post("/api/battle/finish", handle_battle_finish)
     app.router.add_get("/api/crash/state", handle_crash_state)
