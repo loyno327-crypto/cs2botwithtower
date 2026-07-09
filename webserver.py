@@ -294,9 +294,8 @@ async def handle_stats(request: web.Request) -> web.Response:
 
 async def handle_shop_cases(request: web.Request) -> web.Response:
     """Отдаёт список кейсов (тот же static/cases.json, которым пользуется
-    handlers/cases.py) — пока только для просмотра. Сама покупка/открытие
-    кейса прямо из Web App появится на Этапе 7 ("Скины + магазин за
-    монеты"); сейчас кейсы по-прежнему открываются командой в боте."""
+    handlers/cases.py) для витрины. Само открытие — см. handle_cases_open
+    (поддерживает и одиночное открытие, и пачкой по config.CASE_BULK_OPEN_COUNT)."""
     user_data = _authenticate(request)
     if user_data is None:
         return _unauthorized()
@@ -318,14 +317,21 @@ async def handle_shop_cases(request: web.Request) -> web.Response:
             ],
         })
 
-    return web.json_response({"cases": preview})
+    return web.json_response({"cases": preview, "bulk_open_count": config.CASE_BULK_OPEN_COUNT})
 
 
 async def handle_cases_open(request: web.Request) -> web.Response:
     """Открывает кейс прямо из Web App — та же самая логика (шансы,
     списание баланса, XP, скидка по уровню), что использует бот в
     handlers/cases.py (roll_item / case_discounted_price импортированы
-    оттуда напрямую, чтобы гарантированно не разойтись с ботом)."""
+    оттуда напрямую, чтобы гарантированно не разойтись с ботом).
+
+    Поддерживает открытие пачкой: необязательное поле "count" (1..
+    config.CASE_BULK_OPEN_COUNT) открывает несколько кейсов одним запросом.
+    Цена и проверка уровня считаются один раз в начале по стартовому уровню
+    игрока — так нельзя случайно получить более выгодную скидку на часть
+    кейсов из-за уровня, поднятого за опыт от предыдущих кейсов в той же
+    пачке."""
     user_data = _authenticate(request)
     if user_data is None:
         return _unauthorized()
@@ -343,6 +349,13 @@ async def handle_cases_open(request: web.Request) -> web.Response:
     if not case:
         return web.json_response({"error": "case_not_found"}, status=404)
 
+    try:
+        count = int(payload.get("count", 1))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "invalid_count"}, status=400)
+    if count < 1 or count > config.CASE_BULK_OPEN_COUNT:
+        return web.json_response({"error": "invalid_count"}, status=400)
+
     level_info = db.get_level_info(user_id)
     level = level_info["level"]
     min_level = cases_handlers.case_min_level(case)
@@ -350,21 +363,29 @@ async def handle_cases_open(request: web.Request) -> web.Response:
         return web.json_response({"error": "level_too_low", "min_level": min_level}, status=400)
 
     price = cases_handlers.case_discounted_price(case, level)
+    total_price = price * count
     balance = db.get_balance(user_id)
-    if balance < price:
-        return web.json_response({"error": "insufficient_balance", "price": price}, status=400)
+    if balance < total_price:
+        return web.json_response({"error": "insufficient_balance", "price": total_price}, status=400)
 
-    db.add_balance(user_id, -price)
-    item = cases_handlers.roll_item(case)
-    item_id = db.add_item(user_id, item["name"], item["rarity"], item["price"])
-    db.increment_stat(user_id, "cases_opened")
-    xp_reward = cases_handlers.case_xp_reward(case)
-    xp_result = db.add_xp(user_id, xp_reward)
+    db.add_balance(user_id, -total_price)
+
+    items = []
+    for _ in range(count):
+        item = cases_handlers.roll_item(case)
+        item_id = db.add_item(user_id, item["name"], item["rarity"], item["price"])
+        db.increment_stat(user_id, "cases_opened")
+        items.append({"id": item_id, "name": item["name"], "rarity": item["rarity"], "price": item["price"]})
+
+    xp_gained = cases_handlers.case_xp_reward(case) * count
+    xp_result = db.add_xp(user_id, xp_gained)
 
     return web.json_response({
-        "item": {"id": item_id, "name": item["name"], "rarity": item["rarity"], "price": item["price"]},
-        "price_paid": price,
-        "xp_gained": xp_reward,
+        "items": items,
+        "item": items[0],  # для обратной совместимости со старым однокейсовым откликом
+        "count": count,
+        "price_paid": total_price,
+        "xp_gained": xp_gained,
         "balance": db.get_balance(user_id),
         "level_info": xp_result,
     })

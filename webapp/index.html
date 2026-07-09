@@ -273,7 +273,7 @@
   .slots-stage{
     background:radial-gradient(600px 300px at 50% 0%, rgba(34,211,238,0.10), transparent 65%), var(--panel);
     border:1px solid var(--line); border-radius:8px;
-    padding:22px 14px 20px; text-align:center; margin-bottom:14px;
+    padding:22px 14px; text-align:center; margin-bottom:12px;
     transition:border-color .25s ease, box-shadow .25s ease;
   }
   .slots-stage.state-win{border-color:var(--green); box-shadow:0 0 0 1px var(--green), 0 0 22px rgba(61,220,132,.28);}
@@ -300,7 +300,7 @@
   .payline{position:absolute; left:-4px; right:-4px; top:50%; transform:translateY(-50%); z-index:3; display:flex; justify-content:space-between; pointer-events:none;}
   .payline .pin{color:var(--amber); font-size:13px; filter:drop-shadow(0 0 4px rgba(34,211,238,.6));}
   .slots-result{
-    margin-top:14px; font-family:var(--mono); font-size:13px; color:var(--text-dim); min-height:18px;
+    text-align:center; margin:2px 0 14px; font-family:var(--mono); font-size:13px; color:var(--text-dim); min-height:18px;
   }
   .slots-result b{color:var(--text);}
   .slots-result.win{color:var(--green); font-weight:600; font-size:14.5px;}
@@ -480,6 +480,25 @@
     background:var(--amber); color:var(--bg-0); font-weight:700; font-size:13.5px;
     text-transform:uppercase; letter-spacing:.5px;
   }
+  .drop-card.multi{max-width:360px;}
+  .drop-multi-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px;}
+  .drop-multi-item{
+    background:var(--panel-2); border:1px solid var(--line); border-top:2px solid var(--line);
+    border-radius:6px; padding:8px 4px; text-align:center;
+  }
+  .drop-multi-item.rarity-militari{border-top-color:var(--blue);}
+  .drop-multi-item.rarity-zapreshennoe{border-top-color:var(--purple);}
+  .drop-multi-item.rarity-zasekrechennoe{border-top-color:var(--pink);}
+  .drop-multi-item.rarity-taynoe{border-top-color:var(--red);}
+  .drop-multi-item.rarity-redkiy{border-top-color:var(--amber);}
+  .drop-multi-item .emoji{font-size:20px;}
+  .drop-multi-item .name{font-size:10px; font-weight:600; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .drop-multi-item .price{font-family:var(--mono); font-size:10.5px; color:var(--amber); margin-top:2px;}
+  .drop-multi-total{font-family:var(--mono); font-size:13px; color:var(--text-dim); margin-bottom:14px;}
+  .drop-multi-total b{color:var(--amber);}
+  .case-open-row{display:flex; gap:8px; margin-top:4px;}
+  .case-open-row .case-open-btn{margin-top:0;}
+  .case-open-btn.x5{background:var(--panel-2); color:var(--amber); border:1px solid var(--amber-dim); flex:0 0 78px;}
 
   /* ---- Магазин ---- */
   .shop-item-card{
@@ -690,14 +709,15 @@
           <div class="reel-window" id="reel-2"><div class="reel-strip"></div></div>
           <div class="payline"><span class="pin left">▶</span><span class="pin right">◀</span></div>
         </div>
-        <div class="slots-result" id="slots-result">Выбери ставку и крути барабан</div>
       </div>
-
-      <div class="paytable" id="slots-paytable"></div>
 
       <div class="crash-error" id="slots-error"></div>
 
       <div id="slots-panel"></div>
+
+      <div class="slots-result" id="slots-result">Выбери ставку и крути барабан</div>
+
+      <div class="paytable" id="slots-paytable"></div>
     </div>
 
     <div id="upgrade-game" class="hidden">
@@ -1634,11 +1654,13 @@
 
   // ---------- Кейсы ----------
   let casesLoaded = false;
+  const RARITY_EMOJI = {
+    'Милитари': '🔵', 'Запрещённое': '🟪', 'Засекреченное': '🌸',
+    'Тайное': '🔴', 'Редкий спецпредмет': '🟡',
+  };
+
   function showDropOverlay(item, extraNote) {
-    const emoji = {
-      'Милитари': '🔵', 'Запрещённое': '🟪', 'Засекреченное': '🌸',
-      'Тайное': '🔴', 'Редкий спецпредмет': '🟡',
-    }[item.rarity] || '◽';
+    const emoji = RARITY_EMOJI[item.rarity] || '◽';
     const overlay = document.createElement('div');
     overlay.className = 'drop-overlay';
     overlay.innerHTML = `
@@ -1658,13 +1680,40 @@
     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
   }
 
-  async function openCase(caseId, btn) {
+  function showMultiDropOverlay(items, priceTotal, xpGained) {
+    const totalValue = items.reduce((sum, i) => sum + i.price, 0);
+    const overlay = document.createElement('div');
+    overlay.className = 'drop-overlay';
+    overlay.innerHTML = `
+      <div class="drop-card multi">
+        <div class="drop-name" style="margin-bottom:10px;">Открыто ${items.length} кейсов</div>
+        <div class="drop-multi-grid">
+          ${items.map(i => `
+            <div class="drop-multi-item ${rarityClass(i.rarity)}">
+              <div class="emoji">${RARITY_EMOJI[i.rarity] || '◽'}</div>
+              <div class="name">${escapeHtml(i.name)}</div>
+              <div class="price">${fmt(i.price)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="drop-multi-total">Итого предметов на <b>${fmt(totalValue)}</b> монет · +${fmt(xpGained)} XP · заплачено ${fmt(priceTotal)}</div>
+        <button class="drop-close-btn">Забрать</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.drop-close-btn').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  async function openCase(caseId, count, btn) {
     if (btn) btn.disabled = true;
     try {
       const res = await fetch('/api/cases/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
-        body: JSON.stringify({ case_id: caseId }),
+        body: JSON.stringify({ case_id: caseId, count }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1675,7 +1724,11 @@
         alert(msg);
         return;
       }
-      showDropOverlay(data.item, `+${data.xp_gained} XP · заплачено ${fmt(data.price_paid)} монет`);
+      if (count > 1) {
+        showMultiDropOverlay(data.items, data.price_paid, data.xp_gained);
+      } else {
+        showDropOverlay(data.item, `+${data.xp_gained} XP · заплачено ${fmt(data.price_paid)} монет`);
+      }
       loadProfile();
       statsCache = null;
       inventoryLoaded = false;
@@ -1691,6 +1744,7 @@
     el.innerHTML = `<div class="loading-line">загрузка кейсов…</div>`;
     try {
       const data = await apiGet('/api/shop/cases');
+      const bulkCount = data.bulk_open_count || 5;
       const level = meData?.level ?? 1;
       const cardsHtml = data.cases.map(c => {
         const locked = level < c.min_level;
@@ -1706,13 +1760,16 @@
           </div>
           ${locked
             ? `<div class="case-locked-note">🔒 Открывается с ${c.min_level} уровня (у тебя ${level})</div>`
-            : `<button class="case-open-btn" data-case="${c.id}">🔓 Открыть за ${fmt(c.price)}</button>`}
+            : `<div class="case-open-row">
+                <button class="case-open-btn" data-case="${c.id}" data-count="1">🔓 Открыть за ${fmt(c.price)}</button>
+                <button class="case-open-btn x5" data-case="${c.id}" data-count="${bulkCount}">×${bulkCount}</button>
+              </div>`}
         </div>
       `;
       }).join('');
       el.innerHTML = cardsHtml;
       el.querySelectorAll('.case-open-btn').forEach(btn => {
-        btn.addEventListener('click', () => openCase(btn.dataset.case, btn));
+        btn.addEventListener('click', () => openCase(btn.dataset.case, Number(btn.dataset.count), btn));
       });
       casesLoaded = true;
     } catch (e) {
