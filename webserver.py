@@ -17,12 +17,14 @@ import hmac
 import json
 import logging
 import os
+import time
 from urllib.parse import parse_qsl
 
 from aiohttp import web
 
 import config
 import database as db
+from handlers.crash import generate_crash_point
 
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -97,6 +99,36 @@ BATTLE_CONFIG = {
     "tower_weapon_name": "AK-47",
     "tower_weapon_icon": "🔫",
 }
+
+
+# ---------- Crash (перенос из handlers/crash.py в Web App) ----------
+#
+# Точка краха и формула роста множителя берутся из ТОГО ЖЕ кода, что
+# использует бот (generate_crash_point импортирован из handlers/crash.py,
+# CRASH_* константы — из общего config.py), так что вероятность краха и
+# скорость роста один в один совпадают с ботом.
+#
+# В боте множитель растёт дискретными тиками (редактирование сообщения
+# каждые CRASH_TICK_SECONDS) — в Web App вместо этого отдаём клиенту
+# время старта раунда и считаем множитель НЕПРЕРЫВНОЙ функцией от
+# прошедшего времени по той же формуле сложного роста
+# (1 + CRASH_GROWTH_PER_TICK) ** (elapsed / CRASH_TICK_SECONDS) — в
+# моменты, кратные тику, значение совпадает с бото-версией один в один,
+# а между тиками получается гладкая кривая вместо скачков.
+#
+# Раунд — активная игра в памяти процесса (как active_games в
+# handlers/crash.py), сервер — единственный источник правды по итогу:
+# клиент не может подделать множитель на кэшауте, т.к. выплата всегда
+# считается по СЕРВЕРНОМУ прошедшему времени, а не по числу, присланному
+# из браузера.
+_CRASH_GAMES: dict[int, dict] = {}
+
+
+def _crash_multiplier_at(elapsed_seconds: float) -> float:
+    if elapsed_seconds <= 0:
+        return 1.0
+    ticks = elapsed_seconds / config.CRASH_TICK_SECONDS
+    return round((1 + config.CRASH_GROWTH_PER_TICK) ** ticks, 2)
 
 
 def _check_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
@@ -373,6 +405,137 @@ async def handle_battle_finish(request: web.Request) -> web.Response:
     })
 
 
+async def handle_crash_state(request: web.Request) -> web.Response:
+    """Отдаёт текущее состояние раунда (если есть) плюс общий конфиг
+    игры (доступные ставки, скорость роста) — фронтенд дергает этот
+    эндпоинт при открытии вкладки Crash и периодическим поллингом во
+    время раунда, чтобы узнать, не наступил ли крах."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    base = {
+        "bet_options": config.CRASH_BET_OPTIONS,
+        "tick_seconds": config.CRASH_TICK_SECONDS,
+        "growth_per_tick": config.CRASH_GROWTH_PER_TICK,
+    }
+
+    state = _CRASH_GAMES.get(user_id)
+    if not state:
+        return web.json_response({**base, "active": False})
+
+    elapsed = time.time() - state["start_time"]
+    current_mult = _crash_multiplier_at(elapsed)
+
+    if current_mult >= state["crash_point"]:
+        # Игрок не успел забрать — раунд лопнул сам, без явного клика.
+        crash_point = state["crash_point"]
+        bet = state["bet"]
+        _CRASH_GAMES.pop(user_id, None)
+        return web.json_response({
+            **base, "active": True, "crashed": True,
+            "crash_point": crash_point, "bet": bet,
+        })
+
+    return web.json_response({
+        **base, "active": True, "crashed": False,
+        "bet": state["bet"],
+        "multiplier": current_mult,
+        "start_time": int(state["start_time"] * 1000),
+        "potential_payout": int(state["bet"] * current_mult),
+    })
+
+
+async def handle_crash_start(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    existing = _CRASH_GAMES.get(user_id)
+    if existing:
+        elapsed = time.time() - existing["start_time"]
+        if _crash_multiplier_at(elapsed) < existing["crash_point"]:
+            return web.json_response({"error": "already_active"}, status=409)
+        _CRASH_GAMES.pop(user_id, None)
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    try:
+        bet = int(payload.get("bet"))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "invalid_bet"}, status=400)
+
+    if bet not in config.CRASH_BET_OPTIONS:
+        return web.json_response({"error": "invalid_bet"}, status=400)
+
+    balance = db.get_balance(user_id)
+    if balance < bet:
+        return web.json_response({"error": "insufficient_balance"}, status=400)
+
+    db.add_balance(user_id, -bet)
+
+    start_time = time.time()
+    _CRASH_GAMES[user_id] = {
+        "bet": bet,
+        "crash_point": generate_crash_point(),
+        "start_time": start_time,
+    }
+
+    return web.json_response({
+        "bet": bet,
+        "start_time": int(start_time * 1000),
+        "tick_seconds": config.CRASH_TICK_SECONDS,
+        "growth_per_tick": config.CRASH_GROWTH_PER_TICK,
+        "balance": db.get_balance(user_id),
+    })
+
+
+async def handle_crash_cashout(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    state = _CRASH_GAMES.get(user_id)
+    if not state:
+        return web.json_response({"error": "no_active_game"}, status=409)
+
+    elapsed = time.time() - state["start_time"]
+    current_mult = _crash_multiplier_at(elapsed)
+
+    if current_mult >= state["crash_point"]:
+        crash_point = state["crash_point"]
+        bet = state["bet"]
+        _CRASH_GAMES.pop(user_id, None)
+        return web.json_response({
+            "crashed": True, "crash_point": crash_point, "bet": bet,
+            "balance": db.get_balance(user_id),
+        })
+
+    bet = state["bet"]
+    payout = int(bet * current_mult)
+    _CRASH_GAMES.pop(user_id, None)
+
+    db.add_balance(user_id, payout)
+    xp_result = db.add_xp(user_id, config.XP_CRASH_WIN)
+
+    return web.json_response({
+        "crashed": False,
+        "multiplier": current_mult,
+        "bet": bet,
+        "payout": payout,
+        "balance": db.get_balance(user_id),
+        "level_info": xp_result,
+    })
+
+
 async def handle_index(request: web.Request) -> web.Response:
     # aiohttp's add_static НЕ отдаёт index.html автоматически на "/" —
     # он трактует "/" как запрос к самой папке и при show_index=False
@@ -388,6 +551,9 @@ def create_app() -> web.Application:
     app.router.add_get("/api/shop/cases", handle_shop_cases)
     app.router.add_get("/api/battle/config", handle_battle_config)
     app.router.add_post("/api/battle/finish", handle_battle_finish)
+    app.router.add_get("/api/crash/state", handle_crash_state)
+    app.router.add_post("/api/crash/start", handle_crash_start)
+    app.router.add_post("/api/crash/cashout", handle_crash_cashout)
     app.router.add_get("/", handle_index)
     # Всё остальное (css, js, картинки) — статика самой игры.
     app.router.add_static("/", WEBAPP_DIR, show_index=False)

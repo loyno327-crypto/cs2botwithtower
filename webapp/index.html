@@ -188,6 +188,64 @@
   }
   .subview-back:active{color:var(--amber);}
 
+  /* ---- Crash ---- */
+  .crash-stage{
+    background:radial-gradient(600px 300px at 50% 0%, rgba(224,167,46,0.08), transparent 65%), var(--panel);
+    border:1px solid var(--line); border-radius:8px;
+    padding:32px 16px 26px; text-align:center; margin-bottom:14px;
+    position:relative; overflow:hidden; transition:border-color .25s ease, background .3s ease;
+  }
+  .crash-stage.state-crashed{border-color:var(--red); background:radial-gradient(600px 300px at 50% 0%, rgba(193,70,47,0.14), transparent 65%), var(--panel);}
+  .crash-stage.state-won{border-color:var(--green); background:radial-gradient(600px 300px at 50% 0%, rgba(127,174,63,0.14), transparent 65%), var(--panel);}
+  .crash-coef{
+    font-family:var(--mono); font-weight:600; font-size:44px; letter-spacing:1px;
+    color:var(--amber); line-height:1; display:inline-flex; justify-content:center;
+    transition:color .2s ease;
+  }
+  .crash-stage.state-crashed .crash-coef{color:var(--red);}
+  .crash-stage.state-won .crash-coef{color:var(--green);}
+  .crash-coef .digit{
+    display:inline-block; min-width:0.62em; transform-origin:50% 50%;
+  }
+  .crash-coef .digit.tick{ animation:digit-tick .22s ease; }
+  @keyframes digit-tick{
+    0%{ transform:translateY(-22%) scale(1.08); opacity:.55; }
+    100%{ transform:translateY(0) scale(1); opacity:1; }
+  }
+  .crash-sub{
+    margin-top:10px; font-family:var(--mono); font-size:12px; color:var(--text-dim); min-height:16px;
+  }
+  .crash-sub b{color:var(--text);}
+  .crash-status-line{
+    margin-top:6px; font-size:14.5px; font-weight:600; min-height:20px;
+  }
+  .crash-status-line.crashed{color:var(--red);}
+  .crash-status-line.won{color:var(--green);}
+
+  .crash-bet-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:12px;}
+  .crash-bet-btn{
+    padding:12px 4px; border-radius:5px; border:1px solid var(--line); background:var(--panel);
+    color:var(--text); font-family:var(--mono); font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .crash-bet-btn:active{background:var(--panel-2); border-color:var(--amber-dim);}
+  .crash-bet-btn:disabled{opacity:.4;}
+
+  .crash-cashout-btn{
+    width:100%; padding:15px; border:none; border-radius:6px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:15px; letter-spacing:.5px; text-transform:uppercase;
+  }
+  .crash-cashout-btn:disabled{opacity:.5;}
+  .crash-again-btn{
+    width:100%; padding:13px; border-radius:6px; cursor:pointer; margin-top:4px;
+    background:none; border:1px solid var(--line); color:var(--text);
+    font-family:var(--sans); font-weight:600; font-size:13.5px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .crash-error{
+    text-align:center; font-family:var(--mono); font-size:11.5px; color:var(--red);
+    margin-bottom:10px; min-height:14px;
+  }
+
   /* ---- Магазин: кейсы ---- */
   .case-card{
     background:var(--panel); border:1px solid var(--line); border-radius:6px;
@@ -371,6 +429,20 @@
       <button class="subview-back" id="games-back-btn">‹ Все игры</button>
       <div class="placeholder-panel" id="games-detail-body"></div>
     </div>
+
+    <div id="crash-game" class="hidden">
+      <button class="subview-back" id="crash-back-btn">‹ Все игры</button>
+
+      <div class="crash-stage" id="crash-stage">
+        <div class="crash-coef" id="crash-coef">x1.00</div>
+        <div class="crash-sub" id="crash-sub">Выбери ставку, чтобы начать раунд</div>
+        <div class="crash-status-line" id="crash-status-line"></div>
+      </div>
+
+      <div class="crash-error" id="crash-error"></div>
+
+      <div id="crash-panel"></div>
+    </div>
   </div>
 
   <!-- КЕЙСЫ -->
@@ -532,16 +604,9 @@
   }
 
   // ---------- Игры ----------
-  // Этап 1: только структура и переходы между разделами. Сама игровая
-  // логика (Crash / Апгрейд / Слоты) переносится из бота на следующих
-  // этапах — каждая карточка уже сейчас ведёт в свой собственный
-  // под-экран, чтобы дальше просто заменить содержимое placeholder'а.
+  // Crash уже перенесён на реальную логику (см. секцию ниже). Апгрейд и
+  // Слоты пока остаются заглушками — своя очередь на следующих этапах.
   const GAME_INFO = {
-    crash: {
-      icon: '📈',
-      title: 'Crash',
-      body: 'Здесь появится табло коэффициента с плавной анимацией по кадрам и ставка на монеты. Логика и вероятность краша будут полностью совпадать с командой /crash в боте.',
-    },
     upgrade: {
       icon: '⚡',
       title: 'Апгрейд',
@@ -557,8 +622,21 @@
   const gamesListEl = document.getElementById('games-list');
   const gamesDetailEl = document.getElementById('games-detail');
   const gamesDetailBody = document.getElementById('games-detail-body');
+  const crashGameEl = document.getElementById('crash-game');
+
+  function hideAllGameScreens() {
+    gamesListEl.classList.add('hidden');
+    gamesDetailEl.classList.add('hidden');
+    crashGameEl.classList.add('hidden');
+  }
 
   function openGame(key) {
+    if (key === 'crash') {
+      hideAllGameScreens();
+      crashGameEl.classList.remove('hidden');
+      initCrashView();
+      return;
+    }
     const g = GAME_INFO[key];
     if (!g) return;
     gamesDetailBody.innerHTML = `
@@ -567,7 +645,7 @@
       ${g.body}
       <div class="stage-note">Скоро</div>
     `;
-    gamesListEl.classList.add('hidden');
+    hideAllGameScreens();
     gamesDetailEl.classList.remove('hidden');
   }
 
@@ -579,13 +657,249 @@
   });
 
   document.getElementById('games-back-btn').addEventListener('click', () => {
-    gamesDetailEl.classList.add('hidden');
+    stopCrashLoops();
+    hideAllGameScreens();
+    gamesListEl.classList.remove('hidden');
+  });
+
+  document.getElementById('crash-back-btn').addEventListener('click', () => {
+    stopCrashLoops();
+    hideAllGameScreens();
     gamesListEl.classList.remove('hidden');
   });
 
   function resetGamesView() {
-    gamesDetailEl.classList.add('hidden');
+    stopCrashLoops();
+    hideAllGameScreens();
     gamesListEl.classList.remove('hidden');
+  }
+
+  // ---------- Crash ----------
+  // Игра честно посчитана на сервере (webserver.py): точка краха
+  // генерируется той же функцией, что использует бот (generate_crash_point
+  // из handlers/crash.py), а выплата на кэшауте всегда считается по
+  // серверному времени раунда — клиент не может подделать множитель.
+  // Здесь только гладкая визуализация: локально считаем ту же формулу
+  // роста по прошедшему времени (requestAnimationFrame, ~60 кадров/сек),
+  // а лёгкий поллинг раз в ~500мс сверяется с сервером и ловит момент
+  // краха, если игрок не успел забрать вручную.
+  const crashStageEl = document.getElementById('crash-stage');
+  const crashCoefEl = document.getElementById('crash-coef');
+  const crashSubEl = document.getElementById('crash-sub');
+  const crashStatusEl = document.getElementById('crash-status-line');
+  const crashErrorEl = document.getElementById('crash-error');
+  const crashPanelEl = document.getElementById('crash-panel');
+
+  let crashCfg = { betOptions: [], tickSeconds: 0.7, growthPerTick: 0.06 };
+  let crashRound = null; // { bet, startTime } пока раунд активен
+  let crashRafId = null;
+  let crashPollId = null;
+
+  function stopCrashLoops() {
+    if (crashRafId) cancelAnimationFrame(crashRafId);
+    if (crashPollId) clearInterval(crashPollId);
+    crashRafId = null;
+    crashPollId = null;
+  }
+
+  function crashMultiplierAt(elapsedSeconds) {
+    if (elapsedSeconds <= 0) return 1;
+    const ticks = elapsedSeconds / crashCfg.tickSeconds;
+    return Math.pow(1 + crashCfg.growthPerTick, ticks);
+  }
+
+  // "Одометр": перерисовываем только те символы, которые реально
+  // изменились, и проигрываем на них короткую анимацию — это и даёт
+  // эффект электронного табло, где каждая цифра тикает отдельно.
+  function updateCoefDisplay(text) {
+    const prev = crashCoefEl.dataset.prevText || '';
+    if (text.length !== prev.length || crashCoefEl.children.length !== text.length) {
+      crashCoefEl.innerHTML = [...text].map(ch => `<span class="digit">${ch}</span>`).join('');
+    } else {
+      const spans = crashCoefEl.children;
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] !== prev[i]) {
+          spans[i].textContent = text[i];
+          spans[i].classList.remove('tick');
+          void spans[i].offsetWidth; // рестарт CSS-анимации
+          spans[i].classList.add('tick');
+        }
+      }
+    }
+    crashCoefEl.dataset.prevText = text;
+  }
+
+  function setCrashStageState(cls) {
+    crashStageEl.classList.remove('state-crashed', 'state-won');
+    if (cls) crashStageEl.classList.add(cls);
+  }
+
+  function renderBettingPanel() {
+    setCrashStageState(null);
+    updateCoefDisplay('x1.00');
+    crashSubEl.innerHTML = 'Выбери ставку, чтобы начать раунд';
+    crashStatusEl.textContent = '';
+    crashStatusEl.className = 'crash-status-line';
+    crashErrorEl.textContent = '';
+
+    crashPanelEl.innerHTML = `
+      <div class="crash-bet-grid" id="crash-bet-grid">
+        ${crashCfg.betOptions.map(b => `<button class="crash-bet-btn" data-bet="${b}">${fmt(b)}</button>`).join('')}
+      </div>
+    `;
+    crashPanelEl.querySelectorAll('.crash-bet-btn').forEach(btn => {
+      btn.addEventListener('click', () => placeBet(Number(btn.dataset.bet)));
+    });
+  }
+
+  async function placeBet(bet) {
+    crashErrorEl.textContent = '';
+    crashPanelEl.querySelectorAll('.crash-bet-btn').forEach(b => b.disabled = true);
+    try {
+      const res = await fetch('/api/crash/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ bet }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        crashErrorEl.textContent = data.error === 'insufficient_balance'
+          ? 'Недостаточно монет для этой ставки.'
+          : 'Не удалось начать раунд, попробуй ещё раз.';
+        crashPanelEl.querySelectorAll('.crash-bet-btn').forEach(b => b.disabled = false);
+        return;
+      }
+      loadProfile();
+      crashRound = { bet: data.bet, startTime: data.start_time };
+      renderRunningPanel();
+      startCrashAnimation();
+    } catch (e) {
+      crashErrorEl.textContent = 'Нет связи с сервером.';
+      crashPanelEl.querySelectorAll('.crash-bet-btn').forEach(b => b.disabled = false);
+    }
+  }
+
+  function renderRunningPanel() {
+    setCrashStageState(null);
+    crashStatusEl.textContent = '';
+    crashStatusEl.className = 'crash-status-line';
+    crashPanelEl.innerHTML = `<button class="crash-cashout-btn" id="crash-cashout-btn">💸 Забрать</button>`;
+    document.getElementById('crash-cashout-btn').addEventListener('click', callCashout);
+  }
+
+  function startCrashAnimation() {
+    stopCrashLoops();
+
+    function frame() {
+      if (!crashRound) return;
+      const elapsed = (Date.now() - crashRound.startTime) / 1000;
+      const mult = crashMultiplierAt(elapsed);
+      updateCoefDisplay('x' + mult.toFixed(2));
+      crashSubEl.innerHTML = `Возможный выигрыш: <b>${fmt(Math.floor(crashRound.bet * mult))}</b> монет`;
+      crashRafId = requestAnimationFrame(frame);
+    }
+    frame();
+
+    // Лёгкий поллинг — только чтобы поймать крах, если не успели
+    // нажать "Забрать" вручную; сам множитель выше уже считается локально.
+    crashPollId = setInterval(async () => {
+      if (!crashRound) return;
+      try {
+        const state = await apiGet('/api/crash/state');
+        if (state.crashed) {
+          finishAsCrash(state.crash_point, state.bet);
+        } else if (!state.active) {
+          // Раунд закрылся не через наш кэшаут (например, из другой
+          // вкладки) — просто вернёмся к экрану ставки.
+          crashRound = null;
+          stopCrashLoops();
+          renderBettingPanel();
+        }
+      } catch (e) {
+        // сеть моргнула — подождём следующего поллинга
+      }
+    }, 500);
+  }
+
+  async function callCashout() {
+    const btn = document.getElementById('crash-cashout-btn');
+    if (btn) btn.disabled = true;
+    stopCrashLoops();
+    try {
+      const res = await fetch('/api/crash/cashout', {
+        method: 'POST',
+        headers: { 'X-Telegram-Init-Data': initData },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // Раунд уже кем-то закрыт (например, поймали крах поллингом) —
+        // просто перечитаем состояние.
+        initCrashView();
+        return;
+      }
+      if (data.crashed) {
+        finishAsCrash(data.crash_point, data.bet);
+      } else {
+        finishAsWin(data.multiplier, data.payout, data.bet);
+      }
+      loadProfile();
+      statsCache = null;
+    } catch (e) {
+      crashErrorEl.textContent = 'Нет связи с сервером — открой вкладку заново.';
+    }
+  }
+
+  function finishAsCrash(crashPoint, bet) {
+    stopCrashLoops();
+    crashRound = null;
+    setCrashStageState('state-crashed');
+    updateCoefDisplay('x' + Number(crashPoint).toFixed(2));
+    crashSubEl.textContent = '';
+    crashStatusEl.className = 'crash-status-line crashed';
+    crashStatusEl.textContent = `💥 Крах! Ставка ${fmt(bet)} монет сгорела.`;
+    crashPanelEl.innerHTML = `<button class="crash-again-btn" id="crash-again-btn">Играть снова</button>`;
+    document.getElementById('crash-again-btn').addEventListener('click', renderBettingPanel);
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+  }
+
+  function finishAsWin(multiplier, payout, bet) {
+    stopCrashLoops();
+    crashRound = null;
+    setCrashStageState('state-won');
+    updateCoefDisplay('x' + Number(multiplier).toFixed(2));
+    crashSubEl.textContent = '';
+    crashStatusEl.className = 'crash-status-line won';
+    crashStatusEl.textContent = `💸 Забрал! Выигрыш ${fmt(payout)} монет (ставка была ${fmt(bet)}).`;
+    crashPanelEl.innerHTML = `<button class="crash-again-btn" id="crash-again-btn">Играть снова</button>`;
+    document.getElementById('crash-again-btn').addEventListener('click', renderBettingPanel);
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  async function initCrashView() {
+    stopCrashLoops();
+    crashErrorEl.textContent = '';
+    crashSubEl.textContent = 'подключение к серверу…';
+    crashPanelEl.innerHTML = '';
+    try {
+      const state = await apiGet('/api/crash/state');
+      crashCfg = {
+        betOptions: state.bet_options,
+        tickSeconds: state.tick_seconds,
+        growthPerTick: state.growth_per_tick,
+      };
+      if (state.active && state.crashed) {
+        finishAsCrash(state.crash_point, state.bet);
+      } else if (state.active) {
+        crashRound = { bet: state.bet, startTime: state.start_time };
+        renderRunningPanel();
+        startCrashAnimation();
+      } else {
+        renderBettingPanel();
+      }
+    } catch (e) {
+      crashSubEl.textContent = '';
+      crashErrorEl.textContent = 'Не удалось загрузить Crash — попробуй открыть раздел ещё раз.';
+    }
   }
 
   // ---------- Кейсы ----------
