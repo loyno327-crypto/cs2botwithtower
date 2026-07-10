@@ -1,26 +1,19 @@
 from aiogram import Router, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 
-import config
 import database as db
 
 router = Router()
 
 
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
-    keyboard = []
-
-    # "Играть" — первой строкой, одна кнопка по центру. Показываем только
-    # когда задан WEBAPP_URL (см. config.py) — так на этапе разработки,
-    # пока адрес ещё не настроен, бот не ломается попыткой открыть пустую
-    # ссылку.
-    if config.WEBAPP_URL:
-        keyboard.append([
-            KeyboardButton(text="🎮 Играть", web_app=WebAppInfo(url=config.WEBAPP_URL))
-        ])
-
-    keyboard += [
+    # Кнопки "Играть" тут больше нет — запуск Web App теперь идёт через
+    # Menu Button слева от поля ввода (настраивается в @BotFather:
+    # Bot Settings -> Menu Button -> Configure menu button, туда нужно
+    # вставить тот же адрес, что раньше был в WEBAPP_URL). Это единая
+    # точка входа в приложение вместо кнопки в этой reply-клавиатуре.
+    keyboard = [
         [KeyboardButton(text="⚔️ Дуэль"), KeyboardButton(text="🎰 Джекпот"), KeyboardButton(text="🎉 Бонус")],
         [KeyboardButton(text="💰 Баланс"), KeyboardButton(text="💼 Работа")],
         [KeyboardButton(text="📦 Инвентарь"), KeyboardButton(text="🎁 Кейсы")],
