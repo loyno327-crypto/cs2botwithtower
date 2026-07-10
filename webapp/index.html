@@ -1139,7 +1139,13 @@
         return;
       }
       loadProfile();
-      crashRound = { bet: data.bet, startTime: data.start_time };
+      // Раунд только что создан на сервере, поэтому реально прошедшее
+      // время ~0 — берём локальное время получения ответа как точку
+      // отсчёта, а не сырой server-side timestamp. Так множитель всегда
+      // стартует ровно с x1.00, независимо от расхождения часов клиента
+      // и сервера или задержки сети на этом запросе (иначе первый кадр
+      // мог показать сразу x1.3x и выше — множитель "спрыгивал" вперёд).
+      crashRound = { bet: data.bet, startTime: Date.now() };
       renderRunningPanel();
       startCrashAnimation();
     } catch (e) {
@@ -1266,7 +1272,14 @@
       if (state.active && state.crashed) {
         finishAsCrash(state.crash_point, state.bet);
       } else if (state.active) {
-        crashRound = { bet: state.bet, startTime: state.start_time };
+        // Тут раунд уже идёт какое-то время, поэтому x1.00 не годится —
+        // но по той же причине, что и выше, не берём сырой server-side
+        // start_time напрямую. Вместо этого пересчитываем "виртуальный"
+        // локальный startTime из актуального множителя, который прислал
+        // сервер (state.multiplier) — тем же способом, что и ресинхронизация
+        // в поллинге ниже. Это застраховано от расхождения часов.
+        const realElapsed = elapsedForMultiplier(state.multiplier);
+        crashRound = { bet: state.bet, startTime: Date.now() - realElapsed * 1000 };
         renderRunningPanel();
         startCrashAnimation();
       } else {

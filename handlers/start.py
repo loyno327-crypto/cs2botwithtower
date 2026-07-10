@@ -9,22 +9,24 @@ router = Router()
 
 
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
-    keyboard = [
-        [KeyboardButton(text="💰 Баланс"), KeyboardButton(text="💼 Работа")],
-        [KeyboardButton(text="📦 Инвентарь"), KeyboardButton(text="🎁 Кейсы")],
-        [KeyboardButton(text="🛠 Апгрейд"), KeyboardButton(text="⚔️ Дуэль")],
-        [KeyboardButton(text="🚀 Краш"), KeyboardButton(text="🏆 Топ")],
-        [KeyboardButton(text="🎉 Бонус"), KeyboardButton(text="🎰 Джекпот")],
-        [KeyboardButton(text="👤 Профиль")],
-    ]
+    keyboard = []
 
-    # Кнопка появляется только когда задан WEBAPP_URL (см. config.py) —
-    # так на этапе разработки, пока адрес ещё не настроен, бот не ломается
-    # попыткой открыть пустую ссылку.
+    # "Играть" — первой строкой, одна кнопка по центру. Показываем только
+    # когда задан WEBAPP_URL (см. config.py) — так на этапе разработки,
+    # пока адрес ещё не настроен, бот не ломается попыткой открыть пустую
+    # ссылку.
     if config.WEBAPP_URL:
         keyboard.append([
             KeyboardButton(text="🎮 Играть", web_app=WebAppInfo(url=config.WEBAPP_URL))
         ])
+
+    keyboard += [
+        [KeyboardButton(text="⚔️ Дуэль"), KeyboardButton(text="🎰 Джекпот"), KeyboardButton(text="🎉 Бонус")],
+        [KeyboardButton(text="💰 Баланс"), KeyboardButton(text="💼 Работа")],
+        [KeyboardButton(text="📦 Инвентарь"), KeyboardButton(text="🎁 Кейсы")],
+        [KeyboardButton(text="🛠 Апгрейд"), KeyboardButton(text="🚀 Краш")],
+        [KeyboardButton(text="🏆 Топ"), KeyboardButton(text="👤 Профиль")],
+    ]
 
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
