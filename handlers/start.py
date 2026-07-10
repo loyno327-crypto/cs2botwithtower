@@ -8,17 +8,12 @@ router = Router()
 
 
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
-    # Кнопки "Играть" тут больше нет — запуск Web App теперь идёт через
-    # Menu Button слева от поля ввода (настраивается в @BotFather:
-    # Bot Settings -> Menu Button -> Configure menu button, туда нужно
-    # вставить тот же адрес, что раньше был в WEBAPP_URL). Это единая
-    # точка входа в приложение вместо кнопки в этой reply-клавиатуре.
+    # По просьбе — в чате бота остаются только три кнопки. Остальные
+    # разделы (Баланс, Работа, Инвентарь, Кейсы, Апгрейд, Краш, Топ,
+    # Профиль, Играть) теперь доступны только через Web App (Menu Button
+    # в BotFather), эта reply-клавиатура ими больше не дублируется.
     keyboard = [
         [KeyboardButton(text="⚔️ Дуэль"), KeyboardButton(text="🎰 Джекпот"), KeyboardButton(text="🎉 Бонус")],
-        [KeyboardButton(text="💰 Баланс"), KeyboardButton(text="💼 Работа")],
-        [KeyboardButton(text="📦 Инвентарь"), KeyboardButton(text="🎁 Кейсы")],
-        [KeyboardButton(text="🛠 Апгрейд"), KeyboardButton(text="🚀 Краш")],
-        [KeyboardButton(text="🏆 Топ"), KeyboardButton(text="👤 Профиль")],
     ]
 
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
