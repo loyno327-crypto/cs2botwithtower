@@ -116,7 +116,7 @@ async def claim_daily_bonus(message: Message):
             return
 
     reward = random.randint(config.DAILY_BONUS_MIN, config.DAILY_BONUS_MAX)
-    db.add_balance(user_id, reward)
+    db.add_balance(user_id, reward, reason="daily_bonus")
     db.set_last_bonus_time(user_id, datetime.now().isoformat())
     db.set_bonus_notified(user_id, 0)  # чтобы фоновая задача снова уведомила, когда бонус будет готов
     await message.answer(

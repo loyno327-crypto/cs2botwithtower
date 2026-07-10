@@ -84,8 +84,11 @@ async def jackpot_draw_task(bot: Bot):
                             winners = random.sample(all_user_ids, config.JACKPOT_WINNERS_COUNT)
 
                             for winner_id in winners:
-                                db.add_balance(winner_id, config.JACKPOT_WINNER_AMOUNT)
+                                db.add_balance(winner_id, config.JACKPOT_WINNER_AMOUNT, reason="jackpot_win")
                                 db.increment_stat(winner_id, "jackpot_wins")
+                                db.log_event(winner_id, "jackpot_win", details={
+                                    "amount": config.JACKPOT_WINNER_AMOUNT, "winners_count": len(winners),
+                                })
                             db.draw_jackpot_multi(winners, config.JACKPOT_WINNER_AMOUNT)
 
                             names = []

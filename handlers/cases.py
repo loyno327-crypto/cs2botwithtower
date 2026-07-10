@@ -195,13 +195,17 @@ async def open_case(callback: CallbackQuery):
         )
         return
 
-    db.add_balance(user_id, -price)
+    db.add_balance(user_id, -price, reason="case_open")
     item = roll_item(case)
     db.add_item(user_id, item["name"], item["rarity"], item["price"])
     db.increment_stat(user_id, "cases_opened")
     result = db.add_xp(user_id, case_xp_reward(case))
     new_balance = db.get_balance(user_id)
     emoji = RARITY_EMOJI.get(item["rarity"], "◽")
+    db.log_event(user_id, "case_open", details={
+        "case_id": case_id, "case_name": case["name"], "price_paid": price,
+        "item_name": item["name"], "item_rarity": item["rarity"], "item_price": item["price"],
+    })
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"🔓 Открыть ещё за {price}", callback_data=f"open_case:{case_id}")],
@@ -264,7 +268,7 @@ async def open_case_multi(callback: CallbackQuery):
         if balance < price:
             break
 
-        db.add_balance(user_id, -price)
+        db.add_balance(user_id, -price, reason="case_open_bulk")
         item = roll_item(case)
         db.add_item(user_id, item["name"], item["rarity"], item["price"])
         db.increment_stat(user_id, "cases_opened")
@@ -287,6 +291,11 @@ async def open_case_multi(callback: CallbackQuery):
         return
 
     new_balance = db.get_balance(user_id)
+    db.log_event(user_id, "case_open_bulk", details={
+        "case_id": case_id, "case_name": case["name"], "count": len(opened_items),
+        "total_spent": total_spent,
+        "items": [{"name": i["name"], "rarity": i["rarity"], "price": i["price"]} for i in opened_items],
+    })
     lines = [f"📦 Открыто <b>{len(opened_items)}/{OPEN_MULTI_COUNT}</b> кейсов «{case['name']}»!\n"]
     for item in opened_items:
         emoji = RARITY_EMOJI.get(item["rarity"], "◽")

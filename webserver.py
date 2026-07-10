@@ -374,7 +374,7 @@ async def handle_cases_open(request: web.Request) -> web.Response:
     if balance < total_price:
         return web.json_response({"error": "insufficient_balance", "price": total_price}, status=400)
 
-    db.add_balance(user_id, -total_price)
+    db.add_balance(user_id, -total_price, reason="case_open_webapp", source="webapp")
 
     items = []
     for _ in range(count):
@@ -385,6 +385,10 @@ async def handle_cases_open(request: web.Request) -> web.Response:
 
     xp_gained = cases_handlers.case_xp_reward(case) * count
     xp_result = db.add_xp(user_id, xp_gained)
+    db.log_event(user_id, "case_open_bulk" if count > 1 else "case_open", source="webapp", details={
+        "case_id": case_id, "case_name": case["name"], "count": count, "total_spent": total_price,
+        "items": items,
+    })
 
     return web.json_response({
         "items": items,
@@ -440,8 +444,11 @@ async def handle_shop_buy(request: web.Request) -> web.Response:
     if balance < shop_item["price"]:
         return web.json_response({"error": "insufficient_balance"}, status=400)
 
-    db.add_balance(user_id, -shop_item["price"])
+    db.add_balance(user_id, -shop_item["price"], reason="shop_buy", source="webapp")
     new_item_id = db.add_item(user_id, shop_item["name"], shop_item["rarity"], shop_item["price"])
+    db.log_event(user_id, "shop_buy", source="webapp", details={
+        "item_id": shop_item["id"], "item_name": shop_item["name"], "price": shop_item["price"],
+    })
 
     return web.json_response({
         "item": {"id": new_item_id, "name": shop_item["name"], "rarity": shop_item["rarity"], "price": shop_item["price"]},
@@ -504,7 +511,11 @@ async def handle_inventory_sell(request: web.Request) -> web.Response:
 
     price = max(1, int(item["item_price"] * config.SELL_PERCENT))
     db.remove_item(item_id, user_id)
-    db.add_balance(user_id, price)
+    db.add_balance(user_id, price, reason="item_sell_webapp", source="webapp")
+    db.log_event(user_id, "item_sell", source="webapp", details={
+        "item_name": item["item_name"], "item_rarity": item["item_rarity"],
+        "original_price": item["item_price"], "sold_for": price,
+    })
 
     return web.json_response({"sold_for": price, "balance": db.get_balance(user_id)})
 
@@ -528,7 +539,8 @@ async def handle_inventory_sell_all(request: web.Request) -> web.Response:
     count = len(sellable)
 
     db.remove_all_items(user_id)  # защищённые предметы не удаляются
-    db.add_balance(user_id, total_price)
+    db.add_balance(user_id, total_price, reason="item_sell_all_webapp", source="webapp")
+    db.log_event(user_id, "item_sell_all", source="webapp", details={"count": count, "total_price": total_price})
 
     return web.json_response({
         "sold_count": count,
@@ -627,10 +639,42 @@ async def handle_battle_finish(request: web.Request) -> web.Response:
             return lo
         return max(lo, min(n, hi))
 
-    shots_fired = _clamp_int(payload.get("shots_fired", 0), 0, 100_000)
-    hits = _clamp_int(payload.get("hits", 0), 0, shots_fired)
-    headshots = _clamp_int(payload.get("headshots", 0), 0, hits)
-    damage_dealt = _clamp_int(payload.get("damage_dealt", 0), 0, 10_000_000)
+    # Сырые (ДО клампа) значения — сохраняем отдельно, чтобы в логе было
+    # видно, что реально прислал клиент, даже если сервер потом обрежет их
+    # до разумных пределов. Сама игра идёт на Canvas в браузере, так что
+    # это единственный способ заметить клиента, который пытается прислать
+    # физически невозможную статистику (взлом/модификация игры на фронтенде).
+    raw_wave = payload.get("wave_reached")
+    raw_shots = payload.get("shots_fired", 0)
+    raw_hits = payload.get("hits", 0)
+    raw_headshots = payload.get("headshots", 0)
+    raw_damage = payload.get("damage_dealt", 0)
+
+    shots_fired = _clamp_int(raw_shots, 0, 100_000)
+    hits = _clamp_int(raw_hits, 0, shots_fired)
+    headshots = _clamp_int(raw_headshots, 0, hits)
+    damage_dealt = _clamp_int(raw_damage, 0, 10_000_000)
+
+    # Флаги нечестной игры/поломки клиента: сравниваем СЫРЫЕ значения между
+    # собой (клампы уже "чинят" итоговые цифры, но сам факт, что клиент
+    # прислал невозможную комбинацию, стоит зафиксировать).
+    suspicious_flags = []
+    try:
+        if int(raw_hits) > int(raw_shots):
+            suspicious_flags.append("hits>shots_fired")
+        if int(raw_headshots) > int(raw_hits):
+            suspicious_flags.append("headshots>hits")
+        if int(raw_shots) < 0 or int(raw_hits) < 0 or int(raw_headshots) < 0 or int(raw_damage) < 0:
+            suspicious_flags.append("negative_stat")
+        if int(raw_shots) > 100_000 or int(raw_damage) > 10_000_000:
+            suspicious_flags.append("stat_out_of_range")
+    except (TypeError, ValueError):
+        suspicious_flags.append("non_numeric_stat")
+    try:
+        if raw_wave is not None and int(raw_wave) > BATTLE_CONFIG["wave_count"]:
+            suspicious_flags.append("wave_reached>wave_count")
+    except (TypeError, ValueError):
+        pass
 
     reward_coins = wave_reached * BATTLE_CONFIG["reward_per_wave"]
     reward_xp = wave_reached * BATTLE_CONFIG["xp_per_wave"]
@@ -645,6 +689,16 @@ async def handle_battle_finish(request: web.Request) -> web.Response:
     )
 
     accuracy_pct = round(hits / shots_fired * 100) if shots_fired else 0
+
+    db.log_event(user_id, "td_battle_finish", source="webapp", suspicious=bool(suspicious_flags), details={
+        "side": side, "won": won, "wave_reached": wave_reached,
+        "reward_coins": reward_coins, "reward_xp": reward_xp,
+        "shots_fired": shots_fired, "hits": hits, "headshots": headshots,
+        "damage_dealt": damage_dealt, "accuracy_pct": accuracy_pct,
+        "raw_wave_reached": raw_wave, "raw_shots_fired": raw_shots,
+        "raw_hits": raw_hits, "raw_headshots": raw_headshots, "raw_damage_dealt": raw_damage,
+        "flags": ",".join(suspicious_flags) if suspicious_flags else None,
+    })
 
     return web.json_response({
         "reward_coins": reward_coins,
@@ -685,6 +739,7 @@ async def handle_crash_state(request: web.Request) -> web.Response:
         crash_point = state["crash_point"]
         bet = state["bet"]
         _CRASH_GAMES.pop(user_id, None)
+        db.log_event(user_id, "crash_bust", source="webapp", details={"bet": bet, "crash_point": crash_point})
         return web.json_response({
             **base, "active": True, "crashed": True,
             "crash_point": crash_point, "bet": bet,
@@ -731,14 +786,16 @@ async def handle_crash_start(request: web.Request) -> web.Response:
     if balance < bet:
         return web.json_response({"error": "insufficient_balance"}, status=400)
 
-    db.add_balance(user_id, -bet)
+    db.add_balance(user_id, -bet, reason="crash_bet_webapp", source="webapp")
 
     start_time = time.time()
+    crash_point = generate_crash_point()
     _CRASH_GAMES[user_id] = {
         "bet": bet,
-        "crash_point": generate_crash_point(),
+        "crash_point": crash_point,
         "start_time": start_time,
     }
+    db.log_event(user_id, "crash_start", source="webapp", details={"bet": bet, "crash_point": crash_point})
 
     return web.json_response({
         "bet": bet,
@@ -766,6 +823,7 @@ async def handle_crash_cashout(request: web.Request) -> web.Response:
         crash_point = state["crash_point"]
         bet = state["bet"]
         _CRASH_GAMES.pop(user_id, None)
+        db.log_event(user_id, "crash_bust", source="webapp", details={"bet": bet, "crash_point": crash_point})
         return web.json_response({
             "crashed": True, "crash_point": crash_point, "bet": bet,
             "balance": db.get_balance(user_id),
@@ -775,8 +833,11 @@ async def handle_crash_cashout(request: web.Request) -> web.Response:
     payout = int(bet * current_mult)
     _CRASH_GAMES.pop(user_id, None)
 
-    db.add_balance(user_id, payout)
+    db.add_balance(user_id, payout, reason="crash_cashout_webapp", source="webapp")
     xp_result = db.add_xp(user_id, config.XP_CRASH_WIN)
+    db.log_event(user_id, "crash_cashout", source="webapp", details={
+        "bet": bet, "multiplier": current_mult, "payout": payout, "crash_point": state["crash_point"],
+    })
 
     return web.json_response({
         "crashed": False,
@@ -903,6 +964,11 @@ async def handle_upgrade_run(request: web.Request) -> web.Response:
         new_item_id = db.add_item(user_id, new_name, new_rarity, new_price)
         db.increment_stat(user_id, "upgrades_success")
         xp_result = db.add_xp(user_id, config.XP_UPGRADE_SUCCESS)
+        db.log_event(user_id, "upgrade_result", source="webapp", details={
+            "success": True, "multiplier": mult, "chance": chance,
+            "items_used": [{"name": i["item_name"], "price": i["item_price"]} for i in items],
+            "total_price": total_price, "new_name": new_name, "new_price": new_price,
+        })
 
         return web.json_response({
             "success": True,
@@ -922,6 +988,11 @@ async def handle_upgrade_run(request: web.Request) -> web.Response:
             db.remove_item(i["id"], user_id)
         db.increment_stat(user_id, "upgrades_failed")
         db.add_to_jackpot(total_price)  # сгоревшие монеты уходят в джекпот
+        db.log_event(user_id, "upgrade_result", source="webapp", details={
+            "success": False, "multiplier": mult, "chance": chance,
+            "items_used": [{"name": i["item_name"], "price": i["item_price"]} for i in items],
+            "total_price": total_price, "burned_to_jackpot": total_price,
+        })
 
         return web.json_response({
             "success": False,
@@ -956,15 +1027,19 @@ async def handle_slots_spin(request: web.Request) -> web.Response:
     if balance < bet:
         return web.json_response({"error": "insufficient_balance"}, status=400)
 
-    db.add_balance(user_id, -bet)
+    db.add_balance(user_id, -bet, reason="slots_bet", source="webapp")
 
     reels = _spin_reels()
     payout, combo = _slots_payout(reels, bet)
 
     xp_amount = config.XP_SLOTS_SPIN + (config.XP_SLOTS_WIN if payout > 0 else 0)
     if payout > 0:
-        db.add_balance(user_id, payout)
+        db.add_balance(user_id, payout, reason="slots_win", source="webapp")
     xp_result = db.add_xp(user_id, xp_amount)
+    db.log_event(user_id, "slots_spin", source="webapp", details={
+        "bet": bet, "payout": payout, "combo": combo,
+        "reels": [r["id"] for r in reels],
+    })
 
     return web.json_response({
         "reels": [{"id": r["id"], "icon": r["icon"]} for r in reels],

@@ -89,7 +89,7 @@ async def choose_bet(callback: CallbackQuery, bot: Bot):
         await callback.answer(f"Недостаточно монет! Нужно {bet}, у тебя {balance}.", show_alert=True)
         return
 
-    db.add_balance(user_id, -bet)
+    db.add_balance(user_id, -bet, reason="crash_bet")
 
     crash_point = generate_crash_point()
     state = {
@@ -101,6 +101,10 @@ async def choose_bet(callback: CallbackQuery, bot: Bot):
         "message_id": callback.message.message_id,
     }
     active_games[user_id] = state
+    # crash_point пишем в лог сразу (игроку он не показывается) — если
+    # потом возникнет спор "нечестно сгорело слишком быстро", по логу видно
+    # реальную сгенерированную точку краха, а не то, что запомнил игрок.
+    db.log_event(user_id, "crash_start", details={"bet": bet, "crash_point": crash_point})
 
     await callback.message.edit_text(
         f"🚀 Ставка <b>{bet}</b> монет сделана!\n"
@@ -124,6 +128,9 @@ async def _run_crash_loop(bot: Bot, user_id: int, state: dict):
 
         if state["multiplier"] >= state["crash_point"]:
             state["done"] = True
+            db.log_event(user_id, "crash_bust", details={
+                "bet": state["bet"], "crash_point": state["crash_point"],
+            })
             try:
                 await bot.edit_message_text(
                     chat_id=state["chat_id"],
@@ -167,8 +174,11 @@ async def cashout(callback: CallbackQuery):
     bet = state["bet"]
     payout = int(bet * multiplier)
 
-    db.add_balance(user_id, payout)
+    db.add_balance(user_id, payout, reason="crash_cashout")
     result = db.add_xp(user_id, config.XP_CRASH_WIN)
+    db.log_event(user_id, "crash_cashout", details={
+        "bet": bet, "multiplier": multiplier, "payout": payout, "crash_point": state["crash_point"],
+    })
 
     text = (
         f"💸 Забрал на <b>x{multiplier:.2f}</b>!\n"

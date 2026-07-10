@@ -170,7 +170,11 @@ async def sell_item(callback: CallbackQuery):
 
     price = sell_price(item["item_price"])
     db.remove_item(item_id, user_id)
-    db.add_balance(user_id, price)
+    db.add_balance(user_id, price, reason="item_sell")
+    db.log_event(user_id, "item_sell", details={
+        "item_name": item["item_name"], "item_rarity": item["item_rarity"],
+        "original_price": item["item_price"], "sold_for": price,
+    })
 
     await callback.answer(f"✅ Продано за {price} монет!")
 
@@ -198,7 +202,8 @@ async def sell_all(callback: CallbackQuery):
     count = len(sellable)
 
     db.remove_all_items(user_id)  # защищённые предметы не удаляются
-    db.add_balance(user_id, total_price)
+    db.add_balance(user_id, total_price, reason="item_sell_all")
+    db.log_event(user_id, "item_sell_all", details={"count": count, "total_price": total_price})
 
     remaining = len(items) - count
     text = f"🗑 Продано {count} шт. предметов на общую сумму <b>{total_price}</b> монет.\n\n"

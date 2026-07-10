@@ -247,6 +247,11 @@ async def do_upgrade(callback: CallbackQuery):
         db.add_item(user_id, new_name, new_rarity, new_price)
         db.increment_stat(user_id, "upgrades_success")
         xp_result = db.add_xp(user_id, config.XP_UPGRADE_SUCCESS)
+        db.log_event(user_id, "upgrade_result", details={
+            "success": True, "multiplier": mult, "chance": chance,
+            "items_used": [{"name": i["item_name"], "price": i["item_price"]} for i in items],
+            "total_price": total_price, "new_name": new_name, "new_price": new_price,
+        })
 
         text = (
             f"🎉 Апгрейд удался!\n<b>{new_name}</b> теперь стоит "
@@ -260,6 +265,11 @@ async def do_upgrade(callback: CallbackQuery):
             db.remove_item(i["id"], user_id)
         db.increment_stat(user_id, "upgrades_failed")
         db.add_to_jackpot(total_price)  # сгоревшие монеты уходят в джекпот
+        db.log_event(user_id, "upgrade_result", details={
+            "success": False, "multiplier": mult, "chance": chance,
+            "items_used": [{"name": i["item_name"], "price": i["item_price"]} for i in items],
+            "total_price": total_price, "burned_to_jackpot": total_price,
+        })
 
         await callback.message.edit_text(
             f"🔥 Не повезло, всё сгорело. −{total_price} монет в джекпот."

@@ -3,6 +3,9 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 import asyncio
+import html
+import json
+from datetime import datetime
 
 import config
 import database as db
@@ -13,6 +16,141 @@ router = Router()
 
 def _is_admin(user_id: int) -> bool:
     return user_id in config.ADMIN_IDS
+
+
+# ---------- Просмотр журнала событий (диагностика / нечестная игра) ----------
+# Человекочитаемые подписи для основных типов событий из database.event_log.
+# Тип, которого нет в словаре, просто выводится как есть (с ❔), так что
+# новые event_type из будущих фич не потеряются, даже если забыть добавить
+# сюда подпись.
+EVENT_LABELS = {
+    "balance_change": "💰 Баланс",
+    "work_answer": "🧠 Работа",
+    "case_open": "📦 Кейс",
+    "case_open_bulk": "📦 Кейсы (пачка)",
+    "upgrade_result": "🛠 Апгрейд",
+    "duel_queue_join": "⚔️ Дуэль: встал в очередь",
+    "duel_result": "⚔️ Дуэль: итог",
+    "duel_cancel": "⚔️ Дуэль: отмена поиска",
+    "crash_start": "🚀 Краш: ставка",
+    "crash_bust": "💥 Краш: сгорело",
+    "crash_cashout": "💸 Краш: забрал",
+    "item_sell": "🗑 Продажа предмета",
+    "item_sell_all": "🗑 Продажа всего инвентаря",
+    "jackpot_win": "🎰 Выигрыш джекпота",
+    "td_battle_finish": "🎮 Бой Tower Defence",
+    "shop_buy": "🛒 Покупка в магазине",
+    "admin_give": "🛡 Админ: начисление",
+    "admin_broadcast": "🛡 Админ: рассылка",
+    "slots_spin": "🎰 Слоты",
+}
+
+# Какие поля из details показывать в компактной строке лога, в этом порядке.
+_DETAIL_KEYS = (
+    "reason", "result", "case_name", "item_name", "item_rarity",
+    "price_paid", "sold_for", "original_price", "bet", "payout",
+    "crash_point", "multiplier", "chance", "success", "target_id",
+    "new_balance", "opponent_id", "winner_choice", "loser_choice",
+    "text_preview", "sent", "failed", "count", "total_price", "total_spent",
+    "wave_reached", "won", "reward_coins", "accuracy_pct", "flags",
+)
+
+
+def _fmt_time(iso_str: str) -> str:
+    try:
+        return datetime.fromisoformat(iso_str).strftime("%d.%m %H:%M:%S")
+    except (TypeError, ValueError):
+        return iso_str or "?"
+
+
+def _fmt_event_line(row) -> str:
+    """Одна строка лога: время, тип события, сумма (если есть) и ключевые
+    подробности из details — коротко, но так, чтобы по одной строке было
+    понятно, что именно произошло."""
+    label = EVENT_LABELS.get(row["event_type"], f"❔ {row['event_type']}")
+    parts = [f"<b>{_fmt_time(row['created_at'])}</b> {label}"]
+
+    if row["amount"] is not None:
+        sign = "+" if row["amount"] >= 0 else ""
+        amount_part = f"{sign}{row['amount']}"
+        if row["balance_after"] is not None:
+            amount_part += f" (→{row['balance_after']})"
+        parts.append(amount_part)
+
+    if row["details"]:
+        try:
+            details = json.loads(row["details"])
+        except (TypeError, ValueError):
+            details = {}
+        bits = []
+        for key in _DETAIL_KEYS:
+            if key in details and details[key] not in (None, ""):
+                bits.append(f"{key}={html.escape(str(details[key]))}")
+        if bits:
+            parts.append("[" + ", ".join(bits) + "]")
+
+    line = " ".join(parts)
+    if row["suspicious"]:
+        line = "⚠️ " + line
+    return line
+
+
+def _events_reply(rows, title: str, with_user_id: bool = False) -> str:
+    lines = [f"{title} (последние {len(rows)}):\n"]
+    for r in rows:
+        prefix = f"id{r['user_id']}: " if with_user_id else ""
+        lines.append(prefix + _fmt_event_line(r))
+    text = "\n".join(lines)
+    # Telegram режет сообщения примерно на 4096 символов — подрезаем сами,
+    # чтобы не словить ошибку отправки на большом количестве строк.
+    if len(text) > 4000:
+        text = text[:3990] + "\n… (обрезано, запроси меньше строк)"
+    return text
+
+
+def _parse_limit(parts, index, default=30, max_limit=100) -> int:
+    if len(parts) > index:
+        try:
+            return max(1, min(int(parts[index]), max_limit))
+        except ValueError:
+            pass
+    return default
+
+
+@router.message(Command("admin_help"))
+async def cmd_admin_help(message: Message):
+    """Секретная команда: /admin_help
+    Короткая шпаргалка по всем админским командам — сама по себе тоже
+    скрытая (для не-админов бот молчит, как и для остальных команд ниже),
+    чтобы список секретных команд нельзя было узнать, просто написав её."""
+    if not _is_admin(message.from_user.id):
+        return
+
+    text = (
+        "🛡 <b>Админские команды</b>\n\n"
+        "<code>/give user_id amount</code>\n"
+        "Начислить (или списать, если amount отрицательный) монеты игроку.\n\n"
+        "<code>/broadcast текст</code>\n"
+        "Разослать сообщение всем зарегистрированным игрокам.\n\n"
+        "<code>/update_menu</code>\n"
+        "Разослать всем короткое сообщение с актуальной клавиатурой — "
+        "чтобы обновилось меню внизу экрана после изменений в коде.\n\n"
+        "<code>/stats_global</code>\n"
+        "Общая статистика бота: игроки, баланс, кейсы, дуэли, апгрейды и т.д.\n\n"
+        "<code>/logs user_id [кол-во]</code>\n"
+        "Журнал конкретного игрока: изменения баланса, кейсы, апгрейды, "
+        "дуэли, краш, слоты, бои Tower Defence, покупки — всё подряд, "
+        "новые события сверху.\n\n"
+        "<code>/logs_suspicious [кол-во]</code>\n"
+        "События, которые бот сам пометил как подозрительные (например, "
+        "физически невозможная статистика боя) — по всем игрокам сразу.\n\n"
+        "<code>/logs_recent [кол-во]</code>\n"
+        "Общая лента последних событий по всем игрокам — если ID игрока "
+        "заранее неизвестен.\n\n"
+        "<code>/admin_help</code>\n"
+        "Эта шпаргалка."
+    )
+    await message.answer(text)
 
 
 @router.message(Command("give"))
@@ -42,8 +180,12 @@ async def cmd_give(message: Message):
 
     # Начисляем (amount может быть и отрицательным, чтобы забрать монеты)
     db.get_or_create_user(target_id, None)
-    db.add_balance(target_id, amount)
+    db.add_balance(target_id, amount, reason=f"admin_give:{message.from_user.id}")
     new_balance = db.get_balance(target_id)
+    db.log_event(
+        message.from_user.id, "admin_give",
+        details={"target_id": target_id, "amount": amount, "new_balance": new_balance}
+    )
 
     await message.answer(
         f"✅ Готово.\n"
@@ -89,6 +231,10 @@ async def cmd_broadcast(message: Message, bot: Bot):
         except Exception:
             failed += 1
         await asyncio.sleep(0.05)  # не спамим Telegram API слишком быстро
+
+    db.log_event(message.from_user.id, "admin_broadcast", details={
+        "text_preview": content[:200], "sent": sent, "failed": failed,
+    })
 
     await status_msg.edit_text(
         f"📢 Рассылка завершена.\n"
@@ -161,3 +307,82 @@ async def cmd_global_stats(message: Message):
         f"🎰 Сейчас в копилке джекпота: <b>{s['jackpot_amount']}</b> монет"
     )
     await message.answer(text)
+
+
+@router.message(Command("logs"))
+async def cmd_logs(message: Message):
+    """Секретная команда: /logs <user_id> [кол-во]
+    Показывает журнал конкретного игрока: не только изменения баланса, а
+    вообще все значимые события (кейсы, апгрейды, дуэли, краш, слоты, бои
+    Tower Defence, покупки и т.д.) — чтобы можно было разобрать спорную
+    ситуацию, найти баг по цепочке событий или заметить нечестную игру."""
+    if not _is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer(
+            "Использование: <code>/logs user_id [кол-во]</code>\n"
+            "Пример: <code>/logs 123456789 40</code> (по умолчанию 30, максимум 100)\n\n"
+            "Смежные команды:\n"
+            "<code>/logs_suspicious [кол-во]</code> — события, автоматически "
+            "помеченные как подозрительные, по всем игрокам сразу\n"
+            "<code>/logs_recent [кол-во]</code> — общая лента последних "
+            "событий по всем игрокам"
+        )
+        return
+
+    try:
+        target_id = int(parts[1])
+    except ValueError:
+        await message.answer("user_id должен быть целым числом.")
+        return
+
+    limit = _parse_limit(parts, 2)
+    rows = db.get_user_events(target_id, limit=limit)
+    if not rows:
+        await message.answer(f"Событий для игрока <code>{target_id}</code> пока нет.")
+        return
+
+    await message.answer(_events_reply(rows, f"📜 <b>Лог игрока {target_id}</b>"))
+
+
+@router.message(Command("logs_suspicious"))
+async def cmd_logs_suspicious(message: Message):
+    """Секретная команда: /logs_suspicious [кол-во]
+    События, которые бот САМ автоматически пометил как подозрительные —
+    например, если из Web App пришла статистика боя, физически невозможная
+    (попаданий больше выстрелов и т.п.). По всем игрокам сразу — удобно для
+    регулярной проверки на нечестную игру без просмотра каждого игрока
+    по отдельности."""
+    if not _is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split()
+    limit = _parse_limit(parts, 1)
+    rows = db.get_recent_events(limit=limit, suspicious_only=True)
+    if not rows:
+        await message.answer("⚠️ Подозрительных событий пока не найдено.")
+        return
+
+    await message.answer(_events_reply(rows, "⚠️ <b>Подозрительные события</b>", with_user_id=True))
+
+
+@router.message(Command("logs_recent"))
+async def cmd_logs_recent(message: Message):
+    """Секретная команда: /logs_recent [кол-во]
+    Общая лента последних событий по ВСЕМ игрокам сразу (в отличие от
+    /logs — там журнал одного конкретного игрока) — удобно смотреть "живой
+    пульс" бота или искать инцидент по примерному времени, если ID игрока
+    заранее неизвестен."""
+    if not _is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split()
+    limit = _parse_limit(parts, 1)
+    rows = db.get_recent_events(limit=limit)
+    if not rows:
+        await message.answer("Событий пока нет.")
+        return
+
+    await message.answer(_events_reply(rows, "📜 <b>Общая лента событий</b>", with_user_id=True))

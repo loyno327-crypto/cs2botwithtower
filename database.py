@@ -7,6 +7,7 @@
 import sqlite3
 import shutil
 import os
+import json
 from datetime import datetime
 import config
 
@@ -104,6 +105,35 @@ def init_db():
             last_winner_amount INTEGER DEFAULT 0
         )
     """)
+
+    # Журнал событий — общий диагностический лог для АДМИНОВ (не игроков).
+    # В отличие от drop_log (только дропы предметов), сюда пишется КАЖДОЕ
+    # значимое событие в жизни игрока: каждое изменение баланса (с указанием
+    # причины — event_type "balance_change" + details.reason), результаты
+    # кейсов/апгрейдов/дуэлей/краша/слотов/боёв Tower Defence, действия
+    # администраторов и т.д. Нужен, чтобы можно было разобрать конкретную
+    # спорную ситуацию ("откуда взялись/делись монеты", "что реально
+    # произошло в этом бою"), найти баг по цепочке событий или заметить
+    # признаки нечестной игры (см. suspicious). Никогда не чистится и не
+    # редактируется — независимый аудиторский след, отдельный от игровых
+    # таблиц, которые можно менять/удалять в ходе обычной игры.
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS event_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            event_type TEXT,
+            source TEXT,
+            amount INTEGER,
+            balance_after INTEGER,
+            details TEXT,
+            suspicious INTEGER DEFAULT 0,
+            created_at TEXT
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_event_log_user ON event_log(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_event_log_type ON event_log(event_type)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_event_log_suspicious ON event_log(suspicious)")
 
     conn.commit()
 
@@ -231,10 +261,16 @@ def get_balance(user_id: int) -> int:
     return row["balance"] if row else 0
 
 
-def add_balance(user_id: int, amount: int):
+def add_balance(user_id: int, amount: int, reason: str = "", source: str = "bot"):
     """Изменяет баланс пользователя и попутно ведёт учёт того, сколько всего
     монет было получено (amount > 0) или потрачено/проиграно (amount < 0) —
-    это используется в профиле игрока."""
+    это используется в профиле игрока.
+
+    reason — короткий машинный код причины изменения (например "case_open",
+    "duel_win", "admin_give"). КАЖДЫЙ вызов этой функции пишет строку в
+    event_log — это и есть основа "лога монет", но, в отличие от старого
+    total_earned/total_spent, тут видна причина и точный момент каждого
+    отдельного изменения, а не только сумма за всё время."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
@@ -243,7 +279,16 @@ def add_balance(user_id: int, amount: int):
     elif amount < 0:
         cur.execute("UPDATE users SET total_spent = total_spent + ? WHERE user_id = ?", (-amount, user_id))
     conn.commit()
+    cur.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    new_balance = row["balance"] if row else None
     conn.close()
+
+    log_event(
+        user_id, "balance_change",
+        amount=amount, balance_after=new_balance,
+        details={"reason": reason or "unspecified"}, source=source,
+    )
 
 
 def get_last_work_time(user_id: int):
@@ -634,7 +679,7 @@ def record_td_battle_result(
     conn.close()
 
     if reward_coins:
-        add_balance(user_id, reward_coins)
+        add_balance(user_id, reward_coins, reason="td_battle_reward")
     xp_result = add_xp(user_id, reward_xp) if reward_xp else None
 
     return {
@@ -765,6 +810,92 @@ def add_xp(user_id: int, amount: int):
         "xp_needed": xp_needed_for_level(level),
         "bonus_awarded": bonus_awarded,
     }
+
+
+# ---------- Журнал событий (диагностика / нечестная игра) ----------
+
+def log_event(
+    user_id: int, event_type: str, amount: int = None, balance_after: int = None,
+    details: dict = None, source: str = "bot", username: str = None, suspicious: bool = False,
+):
+    """Пишет одну строку в общий журнал событий (см. схему в init_db).
+    details — произвольный словарь с подробностями конкретного события
+    (например, для "case_open" — id/название кейса, выпавший предмет,
+    уплаченная цена); сериализуется в JSON, чтобы не плодить таблицу под
+    каждый тип события. suspicious=True ставится там, где событие само по
+    себе похоже на попытку нечестной игры (например, клиент прислал
+    статистику боя, которая физически невозможна) — такие события удобно
+    смотреть отдельно через get_recent_events(suspicious_only=True)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO event_log (user_id, username, event_type, source, amount, "
+        "balance_after, details, suspicious, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            user_id, username, event_type, source, amount, balance_after,
+            json.dumps(details, ensure_ascii=False) if details is not None else None,
+            1 if suspicious else 0,
+            datetime.now().isoformat(),
+        )
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_user_events(user_id: int, limit: int = 30, event_type: str = None):
+    """Последние события конкретного игрока (самые новые — первые)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    if event_type:
+        cur.execute(
+            "SELECT * FROM event_log WHERE user_id = ? AND event_type = ? "
+            "ORDER BY id DESC LIMIT ?",
+            (user_id, event_type, limit)
+        )
+    else:
+        cur.execute(
+            "SELECT * FROM event_log WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+            (user_id, limit)
+        )
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def get_recent_events(limit: int = 30, event_type: str = None, suspicious_only: bool = False):
+    """Лента последних событий по ВСЕМ игрокам — общий "пульс" бота для
+    админа, либо (suspicious_only=True) только события, автоматически
+    помеченные как подозрительные."""
+    conn = get_connection()
+    cur = conn.cursor()
+    query = "SELECT * FROM event_log WHERE 1=1"
+    params = []
+    if event_type:
+        query += " AND event_type = ?"
+        params.append(event_type)
+    if suspicious_only:
+        query += " AND suspicious = 1"
+    query += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    cur.execute(query, params)
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def count_user_events_since(user_id: int, event_type: str, since_iso: str) -> int:
+    """Сколько событий заданного типа у игрока начиная с указанного момента
+    времени (ISO-строка) — пригодится для простых проверок "слишком часто
+    для человека" (спам одного и того же действия)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT COUNT(*) AS c FROM event_log WHERE user_id = ? AND event_type = ? AND created_at >= ?",
+        (user_id, event_type, since_iso)
+    )
+    row = cur.fetchone()
+    conn.close()
+    return row["c"] if row else 0
 
 
 # ---------- Общая статистика бота (для админов) ----------

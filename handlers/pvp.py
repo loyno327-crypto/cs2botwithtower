@@ -130,7 +130,8 @@ async def rps_pick(callback: CallbackQuery, bot: Bot):
     if not opponent_duel:
         # Соперник не найден — замораживаем ставку и встаём в очередь
         # с уже выбранным ходом.
-        db.add_balance(user_id, -bet)
+        db.add_balance(user_id, -bet, reason="duel_stake")
+        db.log_event(user_id, "duel_queue_join", details={"bet": bet, "choice": choice})
         duel_id = db.create_duel(user_id, bet, username, choice)
         await callback.message.edit_text(
             f"⏳ Ищем соперника на ставку <b>{bet}</b> монет...\n"
@@ -142,7 +143,7 @@ async def rps_pick(callback: CallbackQuery, bot: Bot):
         return
 
     # Соперник найден — оба хода уже известны, разрешаем матч мгновенно.
-    db.add_balance(user_id, -bet)
+    db.add_balance(user_id, -bet, reason="duel_stake")
     db.delete_duel(opponent_duel["id"])
 
     opponent_id = opponent_duel["user_id"]
@@ -155,8 +156,10 @@ async def rps_pick(callback: CallbackQuery, bot: Bot):
         # была бы такая же хрупкая "подвешенная" логика, из-за которой
         # раньше дуэли зависали. Проще и надёжнее — вернуть монеты и дать
         # игрокам самим нажать "Дуэль" ещё раз, если хотят реванш.
-        db.add_balance(user_id, bet)
-        db.add_balance(opponent_id, bet)
+        db.add_balance(user_id, bet, reason="duel_tie_refund")
+        db.add_balance(opponent_id, bet, reason="duel_tie_refund")
+        db.log_event(user_id, "duel_result", details={"bet": bet, "opponent_id": opponent_id, "result": "tie"})
+        db.log_event(opponent_id, "duel_result", details={"bet": bet, "opponent_id": user_id, "result": "tie"})
 
         tie_text = (
             f"⚖️ Ничья! Оба выбрали {CHOICES[choice]}.\n"
@@ -181,12 +184,20 @@ async def rps_pick(callback: CallbackQuery, bot: Bot):
     fee = pot * config.DUEL_HOUSE_FEE_PERCENT // 100
     payout = pot - fee
 
-    db.add_balance(winner_id, payout)
+    db.add_balance(winner_id, payout, reason="duel_win")
     db.increment_stat(winner_id, "duels_played")
     db.increment_stat(winner_id, "duels_won")
     db.increment_stat(loser_id, "duels_played")
     db.add_to_jackpot(fee)  # комиссия дома уходит в общий джекпот
     xp_result = db.add_xp(winner_id, config.XP_DUEL_WIN)
+    db.log_event(winner_id, "duel_result", details={
+        "bet": bet, "opponent_id": loser_id, "result": "win",
+        "winner_choice": winner_choice, "loser_choice": loser_choice, "payout": payout, "fee": fee,
+    })
+    db.log_event(loser_id, "duel_result", details={
+        "bet": bet, "opponent_id": winner_id, "result": "lose",
+        "winner_choice": winner_choice, "loser_choice": loser_choice,
+    })
 
     winner_text = (
         f"⚔️ Дуэль на {bet} монет завершена!\n\n"
@@ -231,6 +242,7 @@ async def cancel_duel(callback: CallbackQuery):
         return
 
     db.delete_duel(duel_id)
-    db.add_balance(user_id, duel["bet"])
+    db.add_balance(user_id, duel["bet"], reason="duel_cancel_refund")
+    db.log_event(user_id, "duel_cancel", details={"bet": duel["bet"]})
     await callback.message.edit_text("❌ Поиск соперника отменён, ставка возвращена.")
     await callback.answer()

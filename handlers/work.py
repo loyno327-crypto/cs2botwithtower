@@ -97,15 +97,17 @@ async def process_answer(callback: CallbackQuery):
     db.set_last_work_time(user_id, datetime.now().isoformat())
 
     if chosen_index == data["correct"]:
-        db.add_balance(user_id, data["reward"])
+        db.add_balance(user_id, data["reward"], reason="work_correct")
         db.increment_stat(user_id, "work_correct")
         result = db.add_xp(user_id, config.XP_WORK)
+        db.log_event(user_id, "work_answer", details={"result": "correct", "reward": data["reward"]})
 
         text = f"✅ Правильно! Ты заработал <b>{data['reward']}</b> монет."
         text += cases.level_up_notice(result)
         await callback.message.edit_text(text)
     else:
         db.increment_stat(user_id, "work_wrong")
+        db.log_event(user_id, "work_answer", details={"result": "wrong"})
         await callback.message.edit_text("❌ Неправильно. В этот раз без награды. Попробуй снова через некоторое время!")
 
     del active_questions[user_id]
