@@ -1,6 +1,6 @@
-from aiogram import Router, Bot
+from aiogram import Router, Bot, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 import asyncio
 import html
@@ -42,6 +42,7 @@ EVENT_LABELS = {
     "shop_buy": "🛒 Покупка в магазине",
     "admin_give": "🛡 Админ: начисление",
     "admin_broadcast": "🛡 Админ: рассылка",
+    "admin_reset_drop_top": "🛡 Админ: очистка топа по дропу",
     "slots_spin": "🎰 Слоты",
 }
 
@@ -128,6 +129,16 @@ async def cmd_admin_help(message: Message):
 
     text = (
         "🛡 <b>Админские команды</b>\n\n"
+        "<code>/find запрос</code>\n"
+        "Найти id игрока прямо в боте — по нику (можно частично, без "
+        "«@») или по точному id. Больше не нужны сторонние боты, чтобы "
+        "узнать id перед /logs.\n\n"
+        "<code>/players</code>\n"
+        "Список всех игроков (новые сверху) с id, ником и балансом, "
+        "листается кнопками — на случай, если /find ничего не нашёл.\n\n"
+        "<code>/reset_drop_top</code>\n"
+        "Полностью очистить топ по дропу (журнал drop_log), с подтверждением. "
+        "Необратимо.\n\n"
         "<code>/give user_id amount</code>\n"
         "Начислить (или списать, если amount отрицательный) монеты игроку.\n\n"
         "<code>/broadcast текст</code>\n"
@@ -307,6 +318,120 @@ async def cmd_global_stats(message: Message):
         f"🎰 Сейчас в копилке джекпота: <b>{s['jackpot_amount']}</b> монет"
     )
     await message.answer(text)
+
+
+def _users_list_text(rows, title: str) -> str:
+    if not rows:
+        return "Никого не нашлось."
+    lines = [f"{title}\n"]
+    for r in rows:
+        name = f"@{r['username']}" if r["username"] else "(без ника)"
+        lines.append(f"• <code>{r['user_id']}</code> — {name} — {r['balance']} монет")
+    return "\n".join(lines)
+
+
+def _players_keyboard(page: int, total: int, page_size: int):
+    buttons = []
+    row = []
+    if page > 0:
+        row.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"admin_players:{page - 1}"))
+    if (page + 1) * page_size < total:
+        row.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"admin_players:{page + 1}"))
+    if row:
+        buttons.append(row)
+    return InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+
+
+@router.message(Command("find"))
+async def cmd_find(message: Message):
+    """Секретная команда: /find <ник или user_id>
+    Ищет игрока прямо в боте — по нику (можно частично, без "@") или по
+    точному id — и показывает его id, ник и баланс. Снимает необходимость
+    искать id игрока через сторонние боты перед тем, как посмотреть его
+    /logs."""
+    if not _is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split(maxsplit=1)
+    if len(parts) != 2:
+        await message.answer(
+            "Использование: <code>/find запрос</code>\n"
+            "Примеры: <code>/find 123456789</code> или <code>/find ivan</code>\n\n"
+            "Если не найдётся — попробуй <code>/players</code>, чтобы "
+            "пролистать всех зарегистрированных игроков."
+        )
+        return
+
+    rows = db.find_users(parts[1])
+    await message.answer(_users_list_text(rows, f"🔎 <b>Результаты поиска «{html.escape(parts[1])}»</b>"))
+
+
+@router.message(Command("players"))
+async def cmd_players(message: Message):
+    """Секретная команда: /players
+    Постраничный список ВСЕХ зарегистрированных игроков (новые сверху) —
+    id, ник, баланс. Пролистывается кнопками, если /find не нашёл нужного
+    (например, игрок ещё не задавал себе ник в Telegram)."""
+    if not _is_admin(message.from_user.id):
+        return
+
+    page_size = 20
+    rows, total = db.get_users_page(offset=0, limit=page_size)
+    text = _users_list_text(rows, f"👥 <b>Игроки</b> (всего: {total})")
+    await message.answer(text, reply_markup=_players_keyboard(0, total, page_size))
+
+
+@router.callback_query(F.data.startswith("admin_players:"))
+async def paginate_players(callback: CallbackQuery):
+    if not _is_admin(callback.from_user.id):
+        await callback.answer()
+        return
+
+    page = int(callback.data.split(":")[1])
+    page_size = 20
+    rows, total = db.get_users_page(offset=page * page_size, limit=page_size)
+    text = _users_list_text(rows, f"👥 <b>Игроки</b> (всего: {total})")
+    await callback.message.edit_text(text, reply_markup=_players_keyboard(page, total, page_size))
+    await callback.answer()
+
+
+@router.message(Command("reset_drop_top"))
+async def cmd_reset_drop_top(message: Message):
+    """Секретная команда: /reset_drop_top
+    Полностью очищает журнал дропов (drop_log), из которого строится топ
+    "по дропу" — например, чтобы убрать оттуда старые записи от апгрейдов
+    (попадали туда до фикса) или обнулить топ в начале нового периода.
+    Необратимо, поэтому сначала спрашиваем подтверждение кнопкой."""
+    if not _is_admin(message.from_user.id):
+        return
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="⚠️ Да, очистить топ по дропу", callback_data="admin_reset_drop_top:confirm"),
+        InlineKeyboardButton(text="Отмена", callback_data="admin_reset_drop_top:cancel"),
+    ]])
+    await message.answer(
+        "Это удалит ВСЮ историю дропов из кейсов (журнал, по которому "
+        "строится топ «по дропу»). Действие необратимо. Продолжить?",
+        reply_markup=keyboard
+    )
+
+
+@router.callback_query(F.data.startswith("admin_reset_drop_top:"))
+async def confirm_reset_drop_top(callback: CallbackQuery):
+    if not _is_admin(callback.from_user.id):
+        await callback.answer()
+        return
+
+    action = callback.data.split(":")[1]
+    if action == "cancel":
+        await callback.message.edit_text("Отменено, топ по дропу не тронут.")
+        await callback.answer()
+        return
+
+    deleted = db.clear_drop_log()
+    db.log_event(callback.from_user.id, "admin_reset_drop_top", details={"deleted": deleted})
+    await callback.message.edit_text(f"✅ Топ по дропу очищен. Удалено записей: {deleted}.")
+    await callback.answer()
 
 
 @router.message(Command("logs"))

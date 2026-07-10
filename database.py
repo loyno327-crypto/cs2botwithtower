@@ -214,6 +214,17 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # Миграция таблицы users: дата регистрации — нужна, чтобы админ мог
+    # смотреть список игроков в порядке "кто когда пришёл", а не только
+    # искать конкретного по нику/id. У уже существующих игроков это поле
+    # останется пустым — ничего страшного, они просто уйдут в конец списка
+    # при сортировке (см. get_users_page).
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN created_at TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     # Разовый бэкфилл: если drop_log ещё пуст, а в inventory уже есть
     # предметы (бот обновился с более старой версии) — копируем их в
     # журнал один раз, чтобы существующие игроки не потеряли историю
@@ -241,9 +252,16 @@ def get_or_create_user(user_id: int, username: str):
 
     if user is None:
         cur.execute(
-            "INSERT INTO users (user_id, username, balance) VALUES (?, ?, ?)",
-            (user_id, username, config.START_BALANCE)
+            "INSERT INTO users (user_id, username, balance, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, username, config.START_BALANCE, datetime.now().isoformat())
         )
+        conn.commit()
+        cur.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        user = cur.fetchone()
+    elif username and username != user["username"]:
+        # Ник в Telegram мог поменяться — обновляем, чтобы админский поиск
+        # по нику (см. find_users) не искал по устаревшему значению.
+        cur.execute("UPDATE users SET username = ? WHERE user_id = ?", (username, user_id))
         conn.commit()
         cur.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
         user = cur.fetchone()
@@ -358,6 +376,56 @@ def get_all_user_ids():
     return [row["user_id"] for row in rows]
 
 
+def find_users(query: str, limit: int = 15):
+    """Поиск игроков для админа: по user_id (если query — число) или по
+    нику (частичное совпадение, без учёта регистра и с/без "@" впереди).
+    Возвращает user_id, username и balance — этого достаточно, чтобы
+    админ увидел нужный id и дальше смотрел /logs без сторонних ботов."""
+    conn = get_connection()
+    cur = conn.cursor()
+
+    query = (query or "").strip().lstrip("@")
+    results = []
+
+    if query.isdigit():
+        cur.execute(
+            "SELECT user_id, username, balance FROM users WHERE user_id = ?",
+            (int(query),)
+        )
+        results = cur.fetchall()
+
+    if not results and query:
+        cur.execute(
+            "SELECT user_id, username, balance FROM users "
+            "WHERE username LIKE ? COLLATE NOCASE "
+            "ORDER BY balance DESC LIMIT ?",
+            (f"%{query}%", limit)
+        )
+        results = cur.fetchall()
+
+    conn.close()
+    return results
+
+
+def get_users_page(offset: int = 0, limit: int = 20):
+    """Постраничный список ВСЕХ игроков (новые — сверху), чтобы админ мог
+    просто пролистать и найти id игрока по нику, если поиск по /find не
+    дал результата (например, ник ещё не сохранён или совсем стёрся)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT user_id, username, balance FROM users "
+        "ORDER BY created_at IS NULL, created_at DESC, user_id DESC "
+        "LIMIT ? OFFSET ?",
+        (limit, offset)
+    )
+    rows = cur.fetchall()
+    cur.execute("SELECT COUNT(*) AS c FROM users")
+    total = cur.fetchone()["c"]
+    conn.close()
+    return rows, total
+
+
 def get_top_users(limit: int = 10):
     conn = get_connection()
     cur = conn.cursor()
@@ -380,6 +448,21 @@ def get_top_users_by_level(limit: int = 10):
     rows = cur.fetchall()
     conn.close()
     return rows
+
+
+def clear_drop_log():
+    """Полностью очищает drop_log — используется админской командой
+    /reset_drop_top, чтобы обнулить топ по дропу (например, после фикса,
+    из-за которого туда раньше попадали апгрейды, или в начале нового
+    сезона — см. concept "Сезоны"). Возвращает, сколько записей удалено."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS c FROM drop_log")
+    count = cur.fetchone()["c"]
+    cur.execute("DELETE FROM drop_log")
+    conn.commit()
+    conn.close()
+    return count
 
 
 def get_top_drops(limit: int = 10):
@@ -414,10 +497,16 @@ def get_top_drops(limit: int = 10):
 
 # ---------- Инвентарь ----------
 
-def add_item(user_id: int, item_name: str, item_rarity: str, item_price: int) -> int:
-    """Добавляет предмет в инвентарь пользователя, а также пишет тот же
-    дроп в drop_log — постоянный журнал, который не трогается при продаже,
-    апгрейде или сгорании предмета (нужен для топа "по дропу за всё время").
+def add_item(user_id: int, item_name: str, item_rarity: str, item_price: int, record_drop: bool = True) -> int:
+    """Добавляет предмет в инвентарь пользователя.
+
+    Если record_drop=True (по умолчанию), тот же предмет пишется ещё и в
+    drop_log — постоянный журнал, который не трогается при продаже,
+    апгрейде или сгорании предмета и используется для топа "по дропу"
+    (см. get_top_drops). Это ДОЛЖНЫ быть только настоящие дропы из кейсов:
+    при вызове из handlers/upgrade.py (предмет, полученный в результате
+    апгрейда, а не выбитый из кейса) нужно передавать record_drop=False,
+    иначе топ по дропу будет засчитывать апгрейды как везение с кейсом.
     Возвращает id предмета в инвентаре."""
     conn = get_connection()
     cur = conn.cursor()
@@ -428,11 +517,12 @@ def add_item(user_id: int, item_name: str, item_rarity: str, item_price: int) ->
         (user_id, item_name, item_rarity, item_price, now)
     )
     item_id = cur.lastrowid
-    cur.execute(
-        "INSERT INTO drop_log (user_id, item_name, item_rarity, item_price, obtained_at) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (user_id, item_name, item_rarity, item_price, now)
-    )
+    if record_drop:
+        cur.execute(
+            "INSERT INTO drop_log (user_id, item_name, item_rarity, item_price, obtained_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, item_name, item_rarity, item_price, now)
+        )
     conn.commit()
     conn.close()
     return item_id

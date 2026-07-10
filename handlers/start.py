@@ -8,12 +8,14 @@ router = Router()
 
 
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
-    # По просьбе — в чате бота остаются только три кнопки. Остальные
-    # разделы (Баланс, Работа, Инвентарь, Кейсы, Апгрейд, Краш, Топ,
-    # Профиль, Играть) теперь доступны только через Web App (Menu Button
-    # в BotFather), эта reply-клавиатура ими больше не дублируется.
+    # Остальные разделы (Баланс, Инвентарь, Кейсы, Апгрейд, Краш, Топ,
+    # Профиль, Играть) доступны через Web App (Menu Button в BotFather),
+    # эта reply-клавиатура ими не дублируется. "Работа" — исключение: она
+    # реализована именно здесь (handlers/work.py), поэтому у неё есть
+    # кнопка в чате. "Дуэль" вынесена отдельной строкой ниже.
     keyboard = [
-        [KeyboardButton(text="⚔️ Дуэль"), KeyboardButton(text="🎰 Джекпот"), KeyboardButton(text="🎉 Бонус")],
+        [KeyboardButton(text="💼 Работа"), KeyboardButton(text="🎰 Джекпот"), KeyboardButton(text="🎉 Бонус")],
+        [KeyboardButton(text="⚔️ Дуэль")],
     ]
 
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
