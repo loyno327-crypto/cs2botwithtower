@@ -135,6 +135,27 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_event_log_type ON event_log(event_type)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_event_log_suspicious ON event_log(suspicious)")
 
+    # Состояние кликера (см. CLICKER_README.md). Отдельная таблица, а не
+    # колонки в users — своя валюта (currency), не пересекается с balance.
+    # click_level/passive_level — уровни двух треков прокачки, из них же
+    # на лету считается click_power и passive_income (config.py).
+    # last_collected_at — момент последнего начисления пассивного дохода,
+    # от него отсчитывается "сколько часов накопилось" при каждом обращении.
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS clicker_state (
+            user_id INTEGER PRIMARY KEY,
+            currency INTEGER DEFAULT 0,
+            click_level INTEGER DEFAULT 0,
+            passive_level INTEGER DEFAULT 0,
+            total_taps INTEGER DEFAULT 0,
+            total_earned INTEGER DEFAULT 0,
+            total_exchanged_currency INTEGER DEFAULT 0,
+            total_exchanged_coins INTEGER DEFAULT 0,
+            last_collected_at TEXT,
+            last_tap_at TEXT
+        )
+    """)
+
     conn.commit()
 
     cur.execute("SELECT id FROM jackpot WHERE id = 1")
@@ -1029,3 +1050,247 @@ def get_global_stats():
         "items_total_value": inv_row["items_total_value"],
         "jackpot_amount": jackpot_row["amount"] if jackpot_row else 0,
     }
+
+
+# ---------- Кликер (см. CLICKER_README.md) ----------
+#
+# Все публичные функции ниже (get_clicker_state, clicker_tap,
+# clicker_buy_upgrade, clicker_exchange) сами создают строку в
+# clicker_state при первом обращении и сами "прогоняют" накопившийся
+# пассивный доход перед своим основным действием — так что снаружи
+# (webserver.py) никогда не нужно отдельно вызывать
+# "накопить пассивный доход", это уже встроено в каждый вызов.
+
+def _clicker_click_power(click_level: int) -> int:
+    return config.CLICKER_BASE_CLICK_POWER + click_level * config.CLICKER_CLICK_UPGRADE_VALUE
+
+
+def _clicker_passive_income(passive_level: int) -> int:
+    return config.CLICKER_BASE_PASSIVE_INCOME + passive_level * config.CLICKER_PASSIVE_UPGRADE_VALUE
+
+
+def _clicker_upgrade_cost(base_cost: float, growth: float, level: int) -> int:
+    return int(round(base_cost * (growth ** level)))
+
+
+def _get_or_create_clicker_row(cur, user_id: int) -> sqlite3.Row:
+    cur.execute("SELECT * FROM clicker_state WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    if row is None:
+        now = datetime.now().isoformat()
+        cur.execute(
+            "INSERT INTO clicker_state (user_id, currency, click_level, passive_level, "
+            "total_taps, total_earned, total_exchanged_currency, total_exchanged_coins, "
+            "last_collected_at, last_tap_at) VALUES (?, 0, 0, 0, 0, 0, 0, 0, ?, NULL)",
+            (user_id, now)
+        )
+        cur.execute("SELECT * FROM clicker_state WHERE user_id = ?", (user_id,))
+        row = cur.fetchone()
+    return row
+
+
+def _apply_clicker_passive_income(cur, row: sqlite3.Row) -> tuple[sqlite3.Row, int]:
+    """Начисляет накопившийся пассивный доход с момента last_collected_at
+    (сколько бы игрок ни отсутствовал — не больше CLICKER_MAX_OFFLINE_HOURS
+    часов за раз, чтобы нельзя было "накопить" доход за месяцы простоя).
+
+    Возвращает (обновлённая_строка, сколько_начислено_за_этот_вызов) — второе
+    нужно для уведомления "пока тебя не было" на фронтенде (см.
+    get_clicker_state), остальные вызовы это значение просто игнорируют."""
+    passive_income = _clicker_passive_income(row["passive_level"])
+    now = datetime.now()
+
+    if passive_income <= 0:
+        # Автосборщик не куплен — просто обновляем метку времени, чтобы
+        # после покупки доход не начислился скачком за всё прошлое время.
+        cur.execute(
+            "UPDATE clicker_state SET last_collected_at = ? WHERE user_id = ?",
+            (now.isoformat(), row["user_id"])
+        )
+        cur.execute("SELECT * FROM clicker_state WHERE user_id = ?", (row["user_id"],))
+        return cur.fetchone(), 0
+
+    last = row["last_collected_at"]
+    elapsed_hours = 0.0
+    if last:
+        try:
+            elapsed_hours = (now - datetime.fromisoformat(last)).total_seconds() / 3600
+        except ValueError:
+            elapsed_hours = 0.0
+    elapsed_hours = max(0.0, min(elapsed_hours, config.CLICKER_MAX_OFFLINE_HOURS))
+
+    earned = int(passive_income * elapsed_hours)
+    if earned > 0:
+        cur.execute(
+            "UPDATE clicker_state SET currency = currency + ?, total_earned = total_earned + ?, "
+            "last_collected_at = ? WHERE user_id = ?",
+            (earned, earned, now.isoformat(), row["user_id"])
+        )
+    else:
+        cur.execute(
+            "UPDATE clicker_state SET last_collected_at = ? WHERE user_id = ?",
+            (now.isoformat(), row["user_id"])
+        )
+
+    cur.execute("SELECT * FROM clicker_state WHERE user_id = ?", (row["user_id"],))
+    return cur.fetchone(), earned
+
+
+def _clicker_state_to_dict(row: sqlite3.Row) -> dict:
+    click_level = row["click_level"]
+    passive_level = row["passive_level"]
+    return {
+        "currency": row["currency"],
+        "click_level": click_level,
+        "passive_level": passive_level,
+        "click_power": _clicker_click_power(click_level),
+        "passive_income": _clicker_passive_income(passive_level),
+        "click_upgrade_cost": _clicker_upgrade_cost(
+            config.CLICKER_CLICK_UPGRADE_BASE_COST, config.CLICKER_CLICK_UPGRADE_GROWTH, click_level
+        ),
+        "passive_upgrade_cost": _clicker_upgrade_cost(
+            config.CLICKER_PASSIVE_UPGRADE_BASE_COST, config.CLICKER_PASSIVE_UPGRADE_GROWTH, passive_level
+        ),
+        "total_taps": row["total_taps"],
+        "total_earned": row["total_earned"],
+        "total_exchanged_currency": row["total_exchanged_currency"],
+        "total_exchanged_coins": row["total_exchanged_coins"],
+    }
+
+
+def get_clicker_state(user_id: int) -> dict:
+    """Актуальное состояние кликера игрока — с уже начисленным пассивным
+    доходом за время отсутствия. Дергается фронтендом при открытии вкладки.
+
+    `offline_collected` в результате — сколько кристаллов начислено именно
+    в этот вызов за счёт отсутствия (0, если игрок только что уже забирал
+    доход или автосборщик не куплен) — фронтенд показывает по нему
+    уведомление "Пока тебя не было, набежало X кристаллов"."""
+    conn = get_connection()
+    cur = conn.cursor()
+    row = _get_or_create_clicker_row(cur, user_id)
+    row, offline_collected = _apply_clicker_passive_income(cur, row)
+    conn.commit()
+    result = _clicker_state_to_dict(row)
+    result["offline_collected"] = offline_collected
+    conn.close()
+    return result
+
+
+def clicker_tap(user_id: int) -> dict:
+    """Один тап: начисляет click_power кристаллов, растит счётчики.
+    Антиспам (минимальный интервал между тапами) проверяется на уровне
+    webserver.py ДО вызова этой функции — сюда долетают только "легальные"
+    тапы."""
+    conn = get_connection()
+    cur = conn.cursor()
+    row = _get_or_create_clicker_row(cur, user_id)
+    row, _ = _apply_clicker_passive_income(cur, row)
+
+    click_power = _clicker_click_power(row["click_level"])
+    now = datetime.now().isoformat()
+    cur.execute(
+        "UPDATE clicker_state SET currency = currency + ?, total_earned = total_earned + ?, "
+        "total_taps = total_taps + 1, last_tap_at = ? WHERE user_id = ?",
+        (click_power, click_power, now, user_id)
+    )
+    conn.commit()
+
+    cur.execute("SELECT * FROM clicker_state WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    result = _clicker_state_to_dict(row)
+    result["gained"] = click_power
+    conn.close()
+    return result
+
+
+def clicker_get_last_tap_at(user_id: int) -> str | None:
+    """Только для проверки антиспама в webserver.py — не трогает и не
+    начисляет пассивный доход, просто читает метку последнего тапа."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT last_tap_at FROM clicker_state WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    conn.close()
+    return row["last_tap_at"] if row else None
+
+
+def clicker_buy_upgrade(user_id: int, track: str) -> dict:
+    """track: 'click' (сила клика) или 'passive' (автосборщик, кристаллов/час).
+    Возвращает {"success": bool, "error": str|None, "state": {...}}."""
+    if track not in ("click", "passive"):
+        return {"success": False, "error": "bad_track", "state": get_clicker_state(user_id)}
+
+    conn = get_connection()
+    cur = conn.cursor()
+    row = _get_or_create_clicker_row(cur, user_id)
+    row, _ = _apply_clicker_passive_income(cur, row)
+
+    if track == "click":
+        level = row["click_level"]
+        cost = _clicker_upgrade_cost(config.CLICKER_CLICK_UPGRADE_BASE_COST, config.CLICKER_CLICK_UPGRADE_GROWTH, level)
+        level_column = "click_level"
+    else:
+        level = row["passive_level"]
+        cost = _clicker_upgrade_cost(config.CLICKER_PASSIVE_UPGRADE_BASE_COST, config.CLICKER_PASSIVE_UPGRADE_GROWTH, level)
+        level_column = "passive_level"
+
+    if row["currency"] < cost:
+        conn.commit()
+        conn.close()
+        return {"success": False, "error": "not_enough_currency", "state": get_clicker_state(user_id)}
+
+    cur.execute(
+        f"UPDATE clicker_state SET currency = currency - ?, {level_column} = {level_column} + 1 WHERE user_id = ?",
+        (cost, user_id)
+    )
+    conn.commit()
+
+    cur.execute("SELECT * FROM clicker_state WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    result = _clicker_state_to_dict(row)
+    conn.close()
+
+    log_event(user_id, "clicker_upgrade", details={"track": track, "new_level": level + 1, "cost": cost})
+    return {"success": True, "error": None, "state": result}
+
+
+def clicker_exchange(user_id: int) -> dict:
+    """Обменивает ВСЕ доступные кристаллы игрока на монеты бота по курсу
+    config.CLICKER_EXCHANGE_RATE (целочисленное деление — остаток меньше
+    курса просто остаётся в кристаллах на следующий раз)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    row = _get_or_create_clicker_row(cur, user_id)
+    row, _ = _apply_clicker_passive_income(cur, row)
+
+    currency = row["currency"]
+    coins = currency // config.CLICKER_EXCHANGE_RATE
+
+    if coins <= 0:
+        conn.commit()
+        conn.close()
+        return {
+            "success": False,
+            "error": "not_enough_currency",
+            "coins_gained": 0,
+            "state": get_clicker_state(user_id),
+        }
+
+    spent_currency = coins * config.CLICKER_EXCHANGE_RATE
+    cur.execute(
+        "UPDATE clicker_state SET currency = currency - ?, total_exchanged_currency = total_exchanged_currency + ?, "
+        "total_exchanged_coins = total_exchanged_coins + ? WHERE user_id = ?",
+        (spent_currency, spent_currency, coins, user_id)
+    )
+    conn.commit()
+
+    cur.execute("SELECT * FROM clicker_state WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    result = _clicker_state_to_dict(row)
+    conn.close()
+
+    add_balance(user_id, coins, reason="clicker_exchange")
+    log_event(user_id, "clicker_exchange", details={"currency_spent": spent_currency, "coins_gained": coins})
+
+    return {"success": True, "error": None, "coins_gained": coins, "state": result}

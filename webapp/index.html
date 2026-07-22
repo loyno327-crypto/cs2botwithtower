@@ -632,6 +632,78 @@
   .top-name{flex:1; font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .top-val{font-family:var(--mono); font-size:13px; color:var(--amber); flex-shrink:0;}
 
+  /* ---- Кликер ---- */
+  .clicker-stage{
+    background:radial-gradient(600px 300px at 50% 0%, rgba(34,197,94,0.10), transparent 65%), var(--panel);
+    border:1px solid var(--line); border-radius:8px;
+    padding:26px 16px 22px; text-align:center; margin-bottom:14px;
+    position:relative; overflow:hidden;
+  }
+  .clicker-currency{font-family:var(--mono); font-weight:700; font-size:34px; color:var(--amber); line-height:1;}
+  .clicker-currency-lbl{
+    font-family:var(--mono); font-size:11px; color:var(--text-dim); letter-spacing:1px;
+    margin-top:4px; text-transform:uppercase;
+  }
+  .clicker-rate{font-family:var(--mono); font-size:11.5px; color:var(--text-dim); margin-top:8px; min-height:16px;}
+  .clicker-tap-btn{
+    width:132px; height:132px; border-radius:50%; margin:20px auto 4px;
+    background:radial-gradient(circle at 35% 30%, var(--amber), var(--amber-dim));
+    border:none; color:var(--bg-0); font-size:52px; cursor:pointer;
+    box-shadow:0 6px 0 var(--amber-dim), 0 10px 20px rgba(21,128,61,.35);
+    display:block; transition:transform .08s ease, box-shadow .08s ease;
+  }
+  .clicker-tap-btn:active{
+    transform:translateY(4px); box-shadow:0 2px 0 var(--amber-dim), 0 4px 10px rgba(21,128,61,.3);
+  }
+  .clicker-tap-btn.pulse{animation:clicker-pulse .18s ease;}
+  @keyframes clicker-pulse{
+    0%{transform:scale(1);}
+    40%{transform:scale(.94);}
+    100%{transform:scale(1);}
+  }
+  .clicker-float-layer{position:absolute; inset:0; pointer-events:none; overflow:hidden;}
+  .clicker-float{
+    position:absolute; bottom:46%; font-family:var(--mono); font-weight:700; font-size:15px;
+    color:var(--amber); animation:clicker-float-up .9s ease forwards;
+  }
+  @keyframes clicker-float-up{
+    0%{opacity:0; transform:translateY(0);}
+    15%{opacity:1;}
+    100%{opacity:0; transform:translateY(-46px);}
+  }
+  .clicker-upgrade-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--amber-dim);
+    border-radius:6px; padding:12px; margin-bottom:8px;
+  }
+  .clicker-upgrade-name{font-size:14px; font-weight:600;}
+  .clicker-upgrade-desc{font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-top:3px;}
+  .clicker-upgrade-buy-btn{
+    flex-shrink:0; padding:10px 12px; border-radius:6px; border:1px solid var(--amber-dim);
+    background:var(--panel-2); color:var(--amber); font-family:var(--mono); font-weight:600;
+    font-size:12.5px; cursor:pointer; white-space:nowrap;
+  }
+  .clicker-upgrade-buy-btn:disabled{opacity:.4; border-color:var(--line); color:var(--text-dim);}
+  .clicker-upgrade-buy-btn:active{background:var(--panel);}
+  .clicker-exchange-btn{
+    width:100%; padding:15px; border:none; border-radius:6px; cursor:pointer; margin-top:6px;
+    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:14.5px; letter-spacing:.5px; text-transform:uppercase;
+  }
+  .clicker-exchange-btn:disabled{opacity:.5;}
+  .clicker-offline-banner{
+    display:flex; align-items:center; gap:10px;
+    background:var(--panel-2); border:1px solid var(--amber-dim); border-radius:6px;
+    padding:11px 12px; margin-bottom:12px; font-size:12.5px; color:var(--text);
+    animation:clicker-banner-in .25s ease;
+  }
+  .clicker-offline-banner .icon{font-size:20px; flex-shrink:0;}
+  .clicker-offline-banner b{color:var(--amber); font-family:var(--mono);}
+  @keyframes clicker-banner-in{
+    0%{opacity:0; transform:translateY(-6px);}
+    100%{opacity:1; transform:translateY(0);}
+  }
+
   nav.tabbar{
     position:fixed; left:0; right:0; bottom:0;
     background:var(--bg-1); border-top:1px solid var(--line);
@@ -669,6 +741,7 @@
     <div class="section-title spaced">Разделы</div>
     <div class="quick-grid">
       <div class="quick-card" data-goto="games"><span class="icon">🎮</span><div class="name">Игры</div></div>
+      <div class="quick-card" data-goto="clicker"><span class="icon">🔷</span><div class="name">Кликер</div></div>
       <div class="quick-card" data-goto="cases"><span class="icon">📦</span><div class="name">Кейсы</div></div>
       <div class="quick-card" data-goto="inventory"><span class="icon">🎒</span><div class="name">Инвентарь</div></div>
     </div>
@@ -757,6 +830,30 @@
     </div>
   </div>
 
+  <!-- КЛИКЕР -->
+  <div class="view" id="view-clicker">
+    <div class="section-title">Кликер</div>
+
+    <div id="clicker-offline-banner"></div>
+
+    <div class="clicker-stage" id="clicker-stage">
+      <div class="clicker-currency" id="clicker-currency">0</div>
+      <div class="clicker-currency-lbl" id="clicker-currency-lbl">Кристаллы</div>
+      <button class="clicker-tap-btn" id="clicker-tap-btn">🔷</button>
+      <div class="clicker-rate" id="clicker-rate"></div>
+      <div class="clicker-float-layer" id="clicker-float-layer"></div>
+    </div>
+
+    <div class="crash-error" id="clicker-error"></div>
+
+    <div class="section-title spaced">Прокачка</div>
+    <div id="clicker-upgrades">
+      <div class="loading-line">загрузка…</div>
+    </div>
+
+    <button class="clicker-exchange-btn" id="clicker-exchange-btn" disabled>Обменять на монеты</button>
+  </div>
+
   <!-- КЕЙСЫ -->
   <div class="view" id="view-cases">
     <div class="section-title">Кейсы</div>
@@ -804,6 +901,7 @@
 <nav class="tabbar">
   <button class="tab active" data-tab="home"><span class="icon">🏠</span>Главная</button>
   <button class="tab" data-tab="games"><span class="icon">🎮</span>Игры</button>
+  <button class="tab" data-tab="clicker"><span class="icon">🔷</span>Кликер</button>
   <button class="tab" data-tab="cases"><span class="icon">📦</span>Кейсы</button>
   <button class="tab" data-tab="inventory"><span class="icon">🎒</span>Инвентарь</button>
   <button class="tab" data-tab="profile"><span class="icon">👤</span>Профиль</button>
@@ -2084,6 +2182,10 @@
         ['Апгрейдов неудачно', fmt(s.upgrades_failed)],
         ['Побед в джекпоте', fmt(s.jackpot_wins)],
         ['Предметов в инвентаре', fmt(s.items_count)],
+        ['🔷 Кликер: тапов всего', fmt(s.clicker_total_taps)],
+        ['🔷 Кликер: заработано кристаллов', fmt(s.clicker_total_earned)],
+        ['🔷 Кликер: обменяно на монеты', fmt(s.clicker_total_exchanged_coins)],
+        ['🔷 Кликер: уровень силы клика / автосборщика', `${fmt(s.clicker_click_level)} / ${fmt(s.clicker_passive_level)}`],
       ];
       let html = `<div class="profile-stat-list">` +
         rows.map(([k, v]) => `<div class="profile-stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') +
@@ -2136,10 +2238,195 @@
     });
   });
 
+  // ---------- Кликер ----------
+  // Держим клиентский троттлинг тапов синхронно с config.CLICKER_MIN_TAP_INTERVAL_MS
+  // на сервере — сервер всё равно главный (см. handle_clicker_tap в webserver.py),
+  // это только чтобы не слать заведомо лишние запросы при очень быстром тапе.
+  const CLICKER_TAP_MIN_INTERVAL_MS = 80;
+
+  let clickerMeta = null;
+  let clickerState = null;
+  let clickerLastTapSentAt = 0;
+
+  const clickerTapBtn = document.getElementById('clicker-tap-btn');
+  const clickerCurrencyEl = document.getElementById('clicker-currency');
+  const clickerCurrencyLblEl = document.getElementById('clicker-currency-lbl');
+  const clickerRateEl = document.getElementById('clicker-rate');
+  const clickerErrorEl = document.getElementById('clicker-error');
+  const clickerUpgradesEl = document.getElementById('clicker-upgrades');
+  const clickerFloatLayerEl = document.getElementById('clicker-float-layer');
+  const clickerExchangeBtn = document.getElementById('clicker-exchange-btn');
+  const clickerOfflineBannerEl = document.getElementById('clicker-offline-banner');
+
+  function renderClickerHud() {
+    if (!clickerState || !clickerMeta) return;
+    clickerCurrencyEl.textContent = fmt(clickerState.currency);
+    clickerCurrencyLblEl.textContent = `${clickerMeta.currency_icon} ${clickerMeta.currency_name}`;
+    clickerRateEl.textContent = clickerState.passive_income > 0
+      ? `+${fmt(clickerState.passive_income)} ${clickerMeta.currency_icon}/час · сила клика +${clickerState.click_power}`
+      : `сила клика +${clickerState.click_power} за тап`;
+    clickerExchangeBtn.textContent = `Обменять на монеты (курс ${fmt(clickerMeta.exchange_rate)}:1)`;
+    clickerExchangeBtn.disabled = clickerState.currency < clickerMeta.exchange_rate;
+  }
+
+  function renderClickerUpgrades() {
+    if (!clickerState || !clickerMeta) return;
+    const canClick = clickerState.currency >= clickerState.click_upgrade_cost;
+    const canPassive = clickerState.currency >= clickerState.passive_upgrade_cost;
+    clickerUpgradesEl.innerHTML = `
+      <div class="clicker-upgrade-row">
+        <div class="clicker-upgrade-info">
+          <div class="clicker-upgrade-name">⚡ Сила клика</div>
+          <div class="clicker-upgrade-desc">Уровень ${clickerState.click_level} · сейчас +${clickerState.click_power} за тап</div>
+        </div>
+        <button class="clicker-upgrade-buy-btn" id="clicker-buy-click" ${canClick ? '' : 'disabled'}>
+          ${fmt(clickerState.click_upgrade_cost)} ${clickerMeta.currency_icon}
+        </button>
+      </div>
+      <div class="clicker-upgrade-row">
+        <div class="clicker-upgrade-info">
+          <div class="clicker-upgrade-name">⚙️ Автосборщик</div>
+          <div class="clicker-upgrade-desc">Уровень ${clickerState.passive_level} · сейчас +${fmt(clickerState.passive_income)} ${clickerMeta.currency_icon}/час</div>
+        </div>
+        <button class="clicker-upgrade-buy-btn" id="clicker-buy-passive" ${canPassive ? '' : 'disabled'}>
+          ${fmt(clickerState.passive_upgrade_cost)} ${clickerMeta.currency_icon}
+        </button>
+      </div>
+    `;
+    document.getElementById('clicker-buy-click').addEventListener('click', () => buyClickerUpgrade('click'));
+    document.getElementById('clicker-buy-passive').addEventListener('click', () => buyClickerUpgrade('passive'));
+  }
+
+  function renderClicker() {
+    renderClickerHud();
+    renderClickerUpgrades();
+  }
+
+  function spawnClickerFloat(text) {
+    const el = document.createElement('div');
+    el.className = 'clicker-float';
+    el.textContent = text;
+    el.style.left = (40 + Math.random() * 20) + '%';
+    clickerFloatLayerEl.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  async function clickerTap() {
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    // Визуальный отклик на нажатие — всегда, даже если сам запрос сейчас
+    // будет пропущен троттлингом (кнопка не должна "залипать" на быстрых тапах).
+    clickerTapBtn.classList.remove('pulse');
+    void clickerTapBtn.offsetWidth;
+    clickerTapBtn.classList.add('pulse');
+
+    const now = Date.now();
+    if (now - clickerLastTapSentAt < CLICKER_TAP_MIN_INTERVAL_MS) return;
+    clickerLastTapSentAt = now;
+
+    try {
+      const res = await fetch('/api/clicker/tap', {
+        method: 'POST',
+        headers: { 'X-Telegram-Init-Data': initData },
+      });
+      if (res.status === 429) return; // догнали лимит сервера — просто не засчитываем этот тап
+      const data = await res.json();
+      if (!res.ok) return;
+      clickerState = data.state;
+      spawnClickerFloat('+' + fmt(data.state.gained));
+      renderClicker();
+    } catch (e) {
+      // сеть моргнула — следующий тап попробует снова, без назойливой ошибки
+    }
+  }
+
+  async function buyClickerUpgrade(track) {
+    clickerErrorEl.textContent = '';
+    try {
+      const res = await fetch('/api/clicker/upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ track }),
+      });
+      const data = await res.json();
+      clickerState = data.state;
+      if (!res.ok) {
+        clickerErrorEl.textContent = data.error === 'not_enough_currency'
+          ? 'Не хватает кристаллов на этот апгрейд.'
+          : 'Не удалось купить апгрейд, попробуй ещё раз.';
+      } else if (tg?.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred('success');
+      }
+      renderClicker();
+    } catch (e) {
+      clickerErrorEl.textContent = 'Нет связи с сервером.';
+    }
+  }
+
+  async function clickerExchange() {
+    clickerErrorEl.textContent = '';
+    clickerExchangeBtn.disabled = true;
+    try {
+      const res = await fetch('/api/clicker/exchange', {
+        method: 'POST',
+        headers: { 'X-Telegram-Init-Data': initData },
+      });
+      const data = await res.json();
+      clickerState = data.state;
+      if (!res.ok) {
+        clickerErrorEl.textContent = `Недостаточно кристаллов для обмена (нужно минимум ${fmt(clickerMeta.exchange_rate)}).`;
+      } else {
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        loadProfile(); // баланс монет в шапке мог измениться
+      }
+      renderClicker();
+    } catch (e) {
+      clickerErrorEl.textContent = 'Нет связи с сервером.';
+    }
+  }
+
+  function renderClickerOfflineBanner() {
+    if (!clickerState || !clickerMeta) return;
+    const collected = clickerState.offline_collected || 0;
+    if (collected <= 0) {
+      clickerOfflineBannerEl.innerHTML = '';
+      return;
+    }
+    clickerOfflineBannerEl.innerHTML = `
+      <div class="clicker-offline-banner">
+        <span class="icon">⏱️</span>
+        <span>Пока тебя не было, автосборщик накопил <b>+${fmt(collected)} ${clickerMeta.currency_icon}</b></span>
+      </div>
+    `;
+  }
+
+  async function initClickerView() {
+    clickerErrorEl.textContent = '';
+    clickerOfflineBannerEl.innerHTML = '';
+    clickerUpgradesEl.innerHTML = '<div class="loading-line">загрузка…</div>';
+    try {
+      const data = await apiGet('/api/clicker/state');
+      clickerMeta = {
+        currency_name: data.currency_name,
+        currency_icon: data.currency_icon,
+        exchange_rate: data.exchange_rate,
+      };
+      clickerState = data.state;
+      renderClicker();
+      renderClickerOfflineBanner();
+    } catch (e) {
+      clickerUpgradesEl.innerHTML = '';
+      clickerErrorEl.textContent = 'Не удалось загрузить кликер — попробуй открыть вкладку заново.';
+    }
+  }
+
+  clickerTapBtn.addEventListener('click', clickerTap);
+  clickerExchangeBtn.addEventListener('click', clickerExchange);
+
   // ---------- Навигация по вкладкам ----------
   const tabRenderers = {
     home: renderHome,
     games: resetGamesView,
+    clicker: initClickerView,
     cases: renderCases,
     inventory: renderInventory,
     profile: renderProfileTab,

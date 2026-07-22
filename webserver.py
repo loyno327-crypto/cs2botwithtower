@@ -19,6 +19,7 @@ import logging
 import os
 import random
 import time
+from datetime import datetime
 from urllib.parse import parse_qsl
 
 from aiohttp import web
@@ -258,6 +259,11 @@ async def handle_stats(request: web.Request) -> web.Response:
         return web.json_response({"error": "user_not_found"}, status=404)
 
     level_info = db.get_level_info(user_id)
+    # Кликер: не даём offline_collected повторно "просочиться" в статистику
+    # профиля отдельным уведомлением — здесь просто нужны итоговые цифры,
+    # начисление за время отсутствия уже применяется при любом обращении
+    # к get_clicker_state, это не побочный эффект специально для этой ручки.
+    clicker = db.get_clicker_state(user_id)
 
     return web.json_response({
         "level": level_info["level"],
@@ -289,6 +295,13 @@ async def handle_stats(request: web.Request) -> web.Response:
             round((user["td_hits"] or 0) / user["td_shots_fired"] * 100)
             if user["td_shots_fired"] else 0
         ),
+        "clicker_currency": clicker["currency"],
+        "clicker_click_level": clicker["click_level"],
+        "clicker_passive_level": clicker["passive_level"],
+        "clicker_total_taps": clicker["total_taps"],
+        "clicker_total_earned": clicker["total_earned"],
+        "clicker_total_exchanged_currency": clicker["total_exchanged_currency"],
+        "clicker_total_exchanged_coins": clicker["total_exchanged_coins"],
     })
 
 
@@ -1017,6 +1030,84 @@ async def handle_slots_config(request: web.Request) -> web.Response:
     })
 
 
+async def handle_clicker_state(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    state = db.get_clicker_state(user_id)
+    return web.json_response({
+        "state": state,
+        "currency_name": config.CLICKER_CURRENCY_NAME,
+        "currency_icon": config.CLICKER_CURRENCY_ICON,
+        "exchange_rate": config.CLICKER_EXCHANGE_RATE,
+    })
+
+
+async def handle_clicker_tap(request: web.Request) -> web.Response:
+    """Один тап. Античит: сервер сам меряет интервал с прошлого тапа этого
+    же игрока (last_tap_at в БД) — если тапнули слишком быстро (быстрее
+    config.CLICKER_MIN_TAP_INTERVAL_MS), запрос отклоняется с 429 и без
+    начисления, чтобы автокликер/скрипт не мог обойти интерфейс и
+    накручивать валюту чаще, чем позволяет реальный человек."""
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    last_tap_at = db.clicker_get_last_tap_at(user_id)
+    if last_tap_at:
+        try:
+            elapsed_ms = (datetime.now() - datetime.fromisoformat(last_tap_at)).total_seconds() * 1000
+        except ValueError:
+            elapsed_ms = config.CLICKER_MIN_TAP_INTERVAL_MS
+        if elapsed_ms < config.CLICKER_MIN_TAP_INTERVAL_MS:
+            return web.json_response({"error": "too_fast"}, status=429)
+
+    state = db.clicker_tap(user_id)
+    return web.json_response({"state": state})
+
+
+async def handle_clicker_upgrade(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response({"error": "invalid_json"}, status=400)
+
+    track = payload.get("track")
+    if track not in ("click", "passive"):
+        return web.json_response({"error": "invalid_track"}, status=400)
+
+    result = db.clicker_buy_upgrade(user_id, track)
+    status = 200 if result["success"] else 400
+    return web.json_response(result, status=status)
+
+
+async def handle_clicker_exchange(request: web.Request) -> web.Response:
+    user_data = _authenticate(request)
+    if user_data is None:
+        return _unauthorized()
+
+    user_id = user_data["id"]
+    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
+
+    result = db.clicker_exchange(user_id)
+    status = 200 if result["success"] else 400
+    return web.json_response(result, status=status)
+
+
 async def handle_index(request: web.Request) -> web.Response:
     # aiohttp's add_static НЕ отдаёт index.html автоматически на "/" —
     # он трактует "/" как запрос к самой папке и при show_index=False
@@ -1044,6 +1135,10 @@ def create_app() -> web.Application:
     app.router.add_get("/api/crash/state", handle_crash_state)
     app.router.add_post("/api/crash/start", handle_crash_start)
     app.router.add_post("/api/crash/cashout", handle_crash_cashout)
+    app.router.add_get("/api/clicker/state", handle_clicker_state)
+    app.router.add_post("/api/clicker/tap", handle_clicker_tap)
+    app.router.add_post("/api/clicker/upgrade", handle_clicker_upgrade)
+    app.router.add_post("/api/clicker/exchange", handle_clicker_exchange)
     app.router.add_get("/", handle_index)
     # Всё остальное (css, js, картинки) — статика самой игры.
     app.router.add_static("/", WEBAPP_DIR, show_index=False)
