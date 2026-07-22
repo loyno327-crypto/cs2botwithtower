@@ -427,34 +427,24 @@
   .paytable-mults b{color:var(--amber); font-weight:600;}
   .paytable-mults .mult-lbl{font-size:9px; display:block; letter-spacing:.5px; color:var(--text-dim); text-align:center;}
 
-  /* ---- Магазин: кейсы ---- */
+  /* ---- Кейсы ---- */
   .case-card{
     background:var(--panel); border:1px solid var(--line); border-radius:6px;
-    padding:14px; margin-bottom:10px;
+    padding:12px 14px; margin-bottom:8px;
   }
-  .case-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
-  .case-name{font-size:15.5px; font-weight:600;}
-  .case-price{font-family:var(--mono); color:var(--amber); font-size:13px; font-weight:600;}
-  .case-meta{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-bottom:10px; letter-spacing:.5px;}
-  .chip-row{display:flex; flex-wrap:wrap; gap:6px;}
-  .chip{
-    font-family:var(--mono); font-size:10.5px; padding:4px 8px; border-radius:3px;
-    background:var(--panel-2); border-left:2px solid var(--line); color:var(--text-dim);
-  }
-  .chip b{color:var(--text);}
-  .shop-hint{
-    text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
-    margin-top:6px; padding-bottom:4px;
-  }
+  .case-head{display:flex; justify-content:space-between; align-items:baseline; gap:10px;}
+  .case-name{font-size:14.5px; font-weight:600;}
+  .case-price{font-family:var(--mono); color:var(--amber); font-size:12.5px; font-weight:600; flex-shrink:0;}
+  .case-meta{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px; letter-spacing:.5px;}
   .case-open-btn{
-    width:100%; padding:11px; border:none; border-radius:5px; cursor:pointer; margin-top:4px;
+    width:100%; padding:10px; border:none; border-radius:5px; cursor:pointer; margin-top:10px;
     background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
-    font-size:13px; text-transform:uppercase; letter-spacing:.5px;
+    font-size:12.5px; text-transform:uppercase; letter-spacing:.5px;
   }
   .case-open-btn:disabled{opacity:.5;}
   .case-locked-note{
     text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
-    margin-top:4px;
+    margin-top:10px;
   }
 
   /* ---- Результат открытия кейса / покупки (оверлей) ---- */
@@ -471,6 +461,9 @@
   .drop-card .drop-name{font-size:17px; font-weight:700; margin-bottom:4px;}
   .drop-card .drop-rarity{font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:10px;}
   .drop-card .drop-price{font-family:var(--mono); font-size:20px; color:var(--amber); font-weight:700; margin-bottom:16px;}
+  .drop-hint{
+    text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+  }
   .drop-card .drop-close-btn{
     width:100%; padding:12px; border:none; border-radius:6px; cursor:pointer;
     background:var(--amber); color:var(--bg-0); font-weight:700; font-size:13.5px;
@@ -556,23 +549,6 @@
   .case-open-row{display:flex; gap:8px; margin-top:4px;}
   .case-open-row .case-open-btn{margin-top:0;}
   .case-open-btn.x5{background:var(--panel-2); color:var(--amber); border:1px solid var(--amber-dim); flex:0 0 78px;}
-
-  /* ---- Магазин ---- */
-  .shop-item-card{
-    background:var(--panel); border:1px solid var(--line); border-radius:6px;
-    padding:14px; margin-bottom:10px; border-left:3px solid var(--purple);
-  }
-  .shop-item-card.locked{opacity:.55;}
-  .shop-item-name{font-size:14.5px; font-weight:600;}
-  .shop-item-rarity{font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:2px;}
-  .shop-item-row{display:flex; align-items:center; justify-content:space-between; margin-top:10px; gap:10px;}
-  .shop-item-price{font-family:var(--mono); color:var(--amber); font-weight:700; font-size:14px;}
-  .shop-buy-btn{
-    padding:9px 16px; border:none; border-radius:5px; cursor:pointer;
-    background:var(--amber); color:var(--bg-0); font-weight:700; font-size:12.5px;
-    text-transform:uppercase; letter-spacing:.5px; flex-shrink:0;
-  }
-  .shop-buy-btn:disabled{opacity:.5;}
 
   /* ---- Инвентарь ---- */
   .item-row{
@@ -694,7 +670,6 @@
     <div class="quick-grid">
       <div class="quick-card" data-goto="games"><span class="icon">🎮</span><div class="name">Игры</div></div>
       <div class="quick-card" data-goto="cases"><span class="icon">📦</span><div class="name">Кейсы</div></div>
-      <div class="quick-card" data-goto="shop"><span class="icon">🛒</span><div class="name">Магазин</div></div>
       <div class="quick-card" data-goto="inventory"><span class="icon">🎒</span><div class="name">Инвентарь</div></div>
     </div>
 
@@ -790,14 +765,6 @@
     </div>
   </div>
 
-  <!-- МАГАЗИН -->
-  <div class="view" id="view-shop">
-    <div class="section-title">Магазин</div>
-    <div id="shop-list">
-      <div class="loading-line">загрузка магазина…</div>
-    </div>
-  </div>
-
   <!-- ИНВЕНТАРЬ -->
   <div class="view" id="view-inventory">
     <div class="section-title">Инвентарь</div>
@@ -838,7 +805,6 @@
   <button class="tab active" data-tab="home"><span class="icon">🏠</span>Главная</button>
   <button class="tab" data-tab="games"><span class="icon">🎮</span>Игры</button>
   <button class="tab" data-tab="cases"><span class="icon">📦</span>Кейсы</button>
-  <button class="tab" data-tab="shop"><span class="icon">🛒</span>Магазин</button>
   <button class="tab" data-tab="inventory"><span class="icon">🎒</span>Инвентарь</button>
   <button class="tab" data-tab="profile"><span class="icon">👤</span>Профиль</button>
   <button class="tab" data-tab="top"><span class="icon">🏆</span>Топ</button>
@@ -1882,7 +1848,7 @@
         <div class="drop-name">${escapeHtml(item.name)}</div>
         <div class="drop-rarity">${escapeHtml(item.rarity)}</div>
         <div class="drop-price">${fmt(item.price)} монет</div>
-        ${extraNote ? `<div class="shop-hint" style="margin-bottom:12px;">${extraNote}</div>` : ''}
+        ${extraNote ? `<div class="drop-hint" style="margin-bottom:12px;">${extraNote}</div>` : ''}
         <button class="drop-close-btn">Забрать</button>
       </div>
     `;
@@ -1968,16 +1934,13 @@
         <div class="case-card">
           <div class="case-head">
             <div class="case-name">${escapeHtml(c.name)}</div>
-            <div class="case-price">${fmt(c.price)} монет</div>
+            <div class="case-price">${fmt(c.price)}</div>
           </div>
-          <div class="case-meta">МИН. УРОВЕНЬ ${c.min_level}</div>
-          <div class="chip-row">
-            ${c.sample_items.map(i => `<span class="chip">${escapeHtml(i.name)} <b>${fmt(i.price)}</b></span>`).join('')}
-          </div>
+          <div class="case-meta">от ${c.min_level} ур.</div>
           ${locked
-            ? `<div class="case-locked-note">🔒 Открывается с ${c.min_level} уровня (у тебя ${level})</div>`
+            ? `<div class="case-locked-note">🔒 Доступно с ${c.min_level} уровня (у тебя ${level})</div>`
             : `<div class="case-open-row">
-                <button class="case-open-btn" data-case="${c.id}" data-count="1">🔓 Открыть за ${fmt(c.price)}</button>
+                <button class="case-open-btn" data-case="${c.id}" data-count="1">Открыть</button>
                 <button class="case-open-btn x5" data-case="${c.id}" data-count="${bulkCount}">×${bulkCount}</button>
               </div>`}
         </div>
@@ -1990,65 +1953,6 @@
       casesLoaded = true;
     } catch (e) {
       el.innerHTML = `<div class="error-line">не удалось загрузить кейсы</div>`;
-    }
-  }
-
-  // ---------- Магазин ----------
-  async function buyShopItem(itemId, btn) {
-    if (btn) btn.disabled = true;
-    try {
-      const res = await fetch('/api/shop/buy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
-        body: JSON.stringify({ item_id: itemId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const msg = data.error === 'insufficient_balance' ? 'Недостаточно монет для этой покупки.'
-          : data.error === 'level_too_low' ? `Предмет откроется с ${data.min_level} уровня.`
-          : 'Не удалось купить, попробуй ещё раз.';
-        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-        alert(msg);
-        return;
-      }
-      showDropOverlay(data.item, 'Куплено в магазине');
-      loadProfile();
-      statsCache = null;
-      inventoryLoaded = false;
-    } catch (e) {
-      alert('Нет связи с сервером.');
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  }
-
-  async function renderShop() {
-    const el = document.getElementById('shop-list');
-    el.innerHTML = `<div class="loading-line">загрузка магазина…</div>`;
-    try {
-      const data = await apiGet('/api/shop/items');
-      if (!data.items.length) {
-        el.innerHTML = `<div class="placeholder-panel"><span class="big">🛒</span>Ассортимент магазина пока пуст.</div>`;
-        return;
-      }
-      el.innerHTML = `<div class="shop-hint" style="margin-bottom:10px;">Эксклюзивные предметы — не выпадают из кейсов или выпадают крайне редко.</div>` +
-        data.items.map(i => `
-          <div class="shop-item-card ${i.unlocked ? '' : 'locked'}">
-            <div class="shop-item-name">${escapeHtml(i.name)}</div>
-            <div class="shop-item-rarity">${escapeHtml(i.rarity)}</div>
-            <div class="shop-item-row">
-              <div class="shop-item-price">${fmt(i.price)} монет</div>
-              ${i.unlocked
-                ? `<button class="shop-buy-btn" data-item="${i.id}">Купить</button>`
-                : `<div class="case-locked-note" style="margin:0;">🔒 с ${i.min_level} ур.</div>`}
-            </div>
-          </div>
-        `).join('');
-      el.querySelectorAll('.shop-buy-btn').forEach(btn => {
-        btn.addEventListener('click', () => buyShopItem(btn.dataset.item, btn));
-      });
-    } catch (e) {
-      el.innerHTML = `<div class="error-line">не удалось загрузить магазин</div>`;
     }
   }
   let inventoryLoaded = false;
@@ -2237,7 +2141,6 @@
     home: renderHome,
     games: resetGamesView,
     cases: renderCases,
-    shop: renderShop,
     inventory: renderInventory,
     profile: renderProfileTab,
     top: () => renderTop('coins'),

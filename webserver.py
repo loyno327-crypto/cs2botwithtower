@@ -401,61 +401,6 @@ async def handle_cases_open(request: web.Request) -> web.Response:
     })
 
 
-async def handle_shop_items(request: web.Request) -> web.Response:
-    """Отдаёт список эксклюзивных предметов магазина (config.SHOP_ITEMS) —
-    их нельзя получить из кейсов, только купить напрямую за монеты."""
-    user_data = _authenticate(request)
-    if user_data is None:
-        return _unauthorized()
-
-    user_id = user_data["id"]
-    level = db.get_level_info(user_id)["level"]
-
-    items = [
-        {**item, "unlocked": level >= item["min_level"]}
-        for item in config.SHOP_ITEMS
-    ]
-    return web.json_response({"items": items, "level": level})
-
-
-async def handle_shop_buy(request: web.Request) -> web.Response:
-    user_data = _authenticate(request)
-    if user_data is None:
-        return _unauthorized()
-
-    user_id = user_data["id"]
-    db.get_or_create_user(user_id, user_data.get("username") or f"id{user_id}")
-
-    try:
-        payload = await request.json()
-    except json.JSONDecodeError:
-        return web.json_response({"error": "invalid_json"}, status=400)
-
-    item_id = payload.get("item_id")
-    shop_item = next((i for i in config.SHOP_ITEMS if i["id"] == item_id), None)
-    if not shop_item:
-        return web.json_response({"error": "item_not_found"}, status=404)
-
-    level = db.get_level_info(user_id)["level"]
-    if level < shop_item["min_level"]:
-        return web.json_response({"error": "level_too_low", "min_level": shop_item["min_level"]}, status=400)
-
-    balance = db.get_balance(user_id)
-    if balance < shop_item["price"]:
-        return web.json_response({"error": "insufficient_balance"}, status=400)
-
-    db.add_balance(user_id, -shop_item["price"], reason="shop_buy", source="webapp")
-    new_item_id = db.add_item(user_id, shop_item["name"], shop_item["rarity"], shop_item["price"])
-    db.log_event(user_id, "shop_buy", source="webapp", details={
-        "item_id": shop_item["id"], "item_name": shop_item["name"], "price": shop_item["price"],
-    })
-
-    return web.json_response({
-        "item": {"id": new_item_id, "name": shop_item["name"], "rarity": shop_item["rarity"], "price": shop_item["price"]},
-        "balance": db.get_balance(user_id),
-    })
-
-
 async def handle_inventory_protect(request: web.Request) -> web.Response:
     """Ставит/снимает защиту с предмета инвентаря (см. database.set_item_protected).
     Защищённый предмет нельзя продать/апгрейднуть ни из Web App, ни из бота —
@@ -1086,8 +1031,6 @@ def create_app() -> web.Application:
     app.router.add_get("/api/stats", handle_stats)
     app.router.add_get("/api/shop/cases", handle_shop_cases)
     app.router.add_post("/api/cases/open", handle_cases_open)
-    app.router.add_get("/api/shop/items", handle_shop_items)
-    app.router.add_post("/api/shop/buy", handle_shop_buy)
     app.router.add_post("/api/inventory/protect", handle_inventory_protect)
     app.router.add_post("/api/inventory/sell", handle_inventory_sell)
     app.router.add_post("/api/inventory/sell_all", handle_inventory_sell_all)

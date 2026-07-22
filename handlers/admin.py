@@ -39,7 +39,6 @@ EVENT_LABELS = {
     "item_sell_all": "🗑 Продажа всего инвентаря",
     "jackpot_win": "🎰 Выигрыш джекпота",
     "td_battle_finish": "🎮 Бой Tower Defence",
-    "shop_buy": "🛒 Покупка в магазине",
     "admin_give": "🛡 Админ: начисление",
     "admin_broadcast": "🛡 Админ: рассылка",
     "admin_reset_drop_top": "🛡 Админ: очистка топа по дропу",
