@@ -1,0 +1,2274 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Web App</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    /* Рестайлинг под светлую зелёно-белую палитру (референс — скриншот
+       приложения "ГдеБЕНЗ"): белые карточки на светло-зелёном фоне,
+       насыщенный зелёный как основной акцент вместо прежнего тёмного
+       неоново-циан оформления. Все элементы UI завязаны на переменные
+       ниже, так что смена палитры не трогает структуру. */
+    --bg-0:#f3f6f4;
+    --bg-1:#ffffff;
+    --panel:#ffffff;
+    --panel-2:#eef3f0;
+    --line:#dfe7e2;
+    --amber:#22c55e;
+    --amber-dim:#15803d;
+    --green:#16a34a;
+    --red:#ef4444;
+    --blue:#3b82f6;
+    --purple:#8b5cf6;
+    --pink:#ec4899;
+    --text:#14181a;
+    --text-dim:#6b7681;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+    --sans: 'Barlow Condensed', Arial, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; height:100%; background:var(--bg-0); color:var(--text); font-family:var(--sans); overscroll-behavior:none;}
+
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(34,197,94,0.08), transparent 60%),
+      var(--bg-0);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
+  header.hud{
+    padding:14px 16px 10px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, var(--bg-1), transparent);
+    position:sticky; top:0; z-index:9;
+  }
+
+  .profile-card{
+    margin-top:12px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-left:3px solid var(--amber);
+    border-radius:4px;
+    padding:12px 14px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .avatar{
+    width:42px; height:42px; border-radius:4px;
+    background:linear-gradient(135deg, #dcf5e6, #eefaf1);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:600; color:var(--amber); font-size:16px;
+    flex-shrink:0;
+  }
+  .profile-info{flex:1; min-width:0;}
+  .profile-name{font-size:17px; font-weight:600; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .profile-meta{
+    font-family:var(--mono); font-size:11px; color:var(--text-dim);
+    margin-top:3px; display:flex; gap:10px; flex-wrap:wrap;
+  }
+  .profile-meta span b{color:var(--amber);}
+  .balance{
+    text-align:right; font-family:var(--mono); flex-shrink:0;
+  }
+  .balance .num{font-size:19px; font-weight:600; color:var(--amber);}
+  .balance .lbl{font-size:9px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase;}
+
+  .xp-track{
+    margin-top:10px; height:4px; background:var(--line); border-radius:2px; overflow:hidden;
+  }
+  .xp-fill{height:100%; background:linear-gradient(90deg, var(--amber-dim), var(--amber)); width:0%; transition:width .6s ease;}
+
+  main{flex:1; padding:16px; padding-bottom:96px;}
+
+  .view{display:none;}
+  .view.active{display:block; animation:fadein .25s ease;}
+
+  /* Использовался в разметке (games-list/games-detail/crash-game/slots-game),
+     но раньше не был объявлен в CSS — из-за этого сразу несколько игровых
+     экранов оказывались видны одновременно (в т.ч. Crash открывался "сам",
+     без клика). Это и есть основной фикс для раздела "Игры". */
+  .hidden{display:none !important;}
+  @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  .section-title{
+    font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--text-dim);
+    text-transform:uppercase; margin:0 0 10px;
+  }
+  .section-title.spaced{margin-top:20px;}
+
+  .placeholder-panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:26px 16px; text-align:center; color:var(--text-dim);
+    font-family:var(--mono); font-size:12px; line-height:1.6;
+  }
+  .placeholder-panel .big{font-size:28px; margin-bottom:8px; display:block;}
+  .placeholder-panel .stage-note{
+    display:inline-block; margin-top:10px; font-size:10px; letter-spacing:1px;
+    color:var(--amber); border:1px solid var(--amber-dim); border-radius:3px; padding:3px 8px;
+  }
+
+  .loading-line{
+    font-family:var(--mono); font-size:11px; color:var(--text-dim); text-align:center; padding:40px 0;
+  }
+  .error-line{
+    font-family:var(--mono); font-size:11px; color:var(--red); text-align:center; padding:24px 12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:4px; line-height:1.6;
+  }
+
+  /* ---- Главная: статистика-плитки ---- */
+  .stat-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  }
+  .stat-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:12px; border-top:2px solid var(--amber-dim);
+  }
+  .stat-card .val{font-family:var(--mono); font-size:20px; font-weight:600; color:var(--amber);}
+  .stat-card .lbl{font-size:11px; color:var(--text-dim); margin-top:2px; text-transform:uppercase; letter-spacing:.5px;}
+
+
+  /* ---- Быстрый доступ на Главной (переход в разделы) ---- */
+  .quick-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .quick-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:14px 10px; text-align:center; cursor:pointer; transition:.15s;
+  }
+  .quick-card:active{background:var(--panel-2);}
+  .quick-card .icon{font-size:22px; display:block; margin-bottom:4px;}
+  .quick-card .name{font-size:13px; font-weight:600;}
+
+  /* ---- Игры: горизонтальный ряд кнопок (Crash / Апгрейд / Слоты / Кейсы) ---- */
+  .game-row{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:4px;
+  }
+  .game-tile{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:14px 4px 10px; text-align:center; cursor:pointer; transition:.15s;
+    border-top:2px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:5px;
+  }
+  .game-tile:active{background:var(--panel-2); transform:scale(.97);}
+  .game-tile.crash{border-top-color:var(--red);}
+  .game-tile.upgrade{border-top-color:var(--purple);}
+  .game-tile.slots{border-top-color:var(--amber);}
+  .game-tile.cases{border-top-color:var(--green);}
+  .game-tile .icon{font-size:24px; line-height:1;}
+  .game-tile .name{font-size:11.5px; font-weight:600; line-height:1.2;}
+
+  .game-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:16px; margin-bottom:10px; display:flex; align-items:center; gap:14px;
+    cursor:pointer; transition:.15s; border-left:3px solid var(--line);
+  }
+  .game-card:active{background:var(--panel-2);}
+  .game-card.crash{border-left-color:var(--red);}
+  .game-card.upgrade{border-left-color:var(--purple);}
+  .game-card.slots{border-left-color:var(--amber);}
+  .game-card .icon{font-size:28px; flex-shrink:0;}
+  .game-card .info{flex:1; min-width:0;}
+  .game-card .name{font-size:16px; font-weight:600;}
+  .game-card .desc{font-size:12px; color:var(--text-dim); margin-top:2px; line-height:1.4;}
+  .game-card .arrow{font-family:var(--mono); color:var(--text-dim); font-size:16px;}
+
+  .subview-back{
+    display:inline-flex; align-items:center; gap:6px; background:none; border:none;
+    color:var(--text-dim); font-family:var(--sans); font-size:13px; font-weight:600;
+    padding:6px 0 14px; cursor:pointer;
+  }
+  .subview-back:active{color:var(--amber);}
+
+  /* ---- Crash ---- */
+  .crash-stage{
+    background:radial-gradient(600px 300px at 50% 0%, rgba(34,197,94,0.10), transparent 65%), var(--panel);
+    border:1px solid var(--line); border-radius:8px;
+    padding:32px 16px 26px; text-align:center; margin-bottom:14px;
+    position:relative; overflow:hidden; transition:border-color .25s ease, background .3s ease;
+  }
+  .crash-stage.state-crashed{border-color:var(--red); background:radial-gradient(600px 300px at 50% 0%, rgba(239,68,68,0.14), transparent 65%), var(--panel);}
+  .crash-stage.state-won{border-color:var(--green); background:radial-gradient(600px 300px at 50% 0%, rgba(22,163,74,0.14), transparent 65%), var(--panel);}
+  .crash-coef{
+    font-family:var(--mono); font-weight:600; font-size:44px; letter-spacing:1px;
+    color:var(--amber); line-height:1; display:inline-flex; justify-content:center;
+    transition:color .2s ease;
+  }
+  .crash-stage.state-crashed .crash-coef{color:var(--red);}
+  .crash-stage.state-won .crash-coef{color:var(--green);}
+  .crash-coef .digit{
+    display:inline-block; min-width:0.62em; transform-origin:50% 50%;
+  }
+  .crash-coef .digit.tick{ animation:digit-tick .22s ease; }
+  @keyframes digit-tick{
+    0%{ transform:translateY(-22%) scale(1.08); opacity:.55; }
+    100%{ transform:translateY(0) scale(1); opacity:1; }
+  }
+  .crash-sub{
+    margin-top:10px; font-family:var(--mono); font-size:12px; color:var(--text-dim); min-height:16px;
+  }
+  .crash-sub b{color:var(--text);}
+  .crash-status-line{
+    margin-top:6px; font-size:14.5px; font-weight:600; min-height:20px;
+  }
+  .crash-status-line.crashed{color:var(--red);}
+  .crash-status-line.won{color:var(--green);}
+
+  .crash-bet-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:12px;}
+  .crash-bet-btn{
+    padding:12px 4px; border-radius:5px; border:1px solid var(--line); background:var(--panel);
+    color:var(--text); font-family:var(--mono); font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .crash-bet-btn:active{background:var(--panel-2); border-color:var(--amber-dim);}
+  .crash-bet-btn:disabled{opacity:.4;}
+
+  .crash-cashout-btn{
+    width:100%; padding:15px; border:none; border-radius:6px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:15px; letter-spacing:.5px; text-transform:uppercase;
+  }
+  .crash-cashout-btn:disabled{opacity:.5;}
+  .crash-again-btn{
+    width:100%; padding:13px; border-radius:6px; cursor:pointer; margin-top:4px;
+    background:none; border:1px solid var(--line); color:var(--text);
+    font-family:var(--sans); font-weight:600; font-size:13.5px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .crash-error{
+    text-align:center; font-family:var(--mono); font-size:11.5px; color:var(--red);
+    margin-bottom:10px; min-height:14px;
+  }
+
+  /* ---- Слоты ---- */
+  .slots-stage{
+    background:radial-gradient(600px 300px at 50% 0%, rgba(34,197,94,0.10), transparent 65%), var(--panel);
+    border:1px solid var(--line); border-radius:8px;
+    padding:22px 14px; text-align:center; margin-bottom:12px;
+    transition:border-color .25s ease, box-shadow .25s ease;
+  }
+  .slots-stage.state-win{border-color:var(--green); box-shadow:0 0 0 1px var(--green), 0 0 22px rgba(22,163,74,.28);}
+  .slots-stage.state-lose{border-color:var(--line);}
+  .slots-frame{
+    position:relative; display:flex; gap:8px; justify-content:center; align-items:center;
+    background:var(--bg-1); border:1px solid var(--line); border-radius:10px;
+    padding:12px; box-shadow:inset 0 2px 10px rgba(0,0,0,.5);
+  }
+  .reel-window{
+    width:72px; height:72px; overflow:hidden; position:relative;
+    background:linear-gradient(180deg, #050810, #0c1526 45%, #0c1526 55%, #050810);
+    border:1px solid var(--line); border-radius:8px;
+  }
+  .reel-window::before{
+    content:''; position:absolute; inset:0; z-index:2; pointer-events:none;
+    background:linear-gradient(180deg, rgba(6,9,17,.9), transparent 30%, transparent 70%, rgba(6,9,17,.9));
+  }
+  .reel-strip{display:flex; flex-direction:column; will-change:transform;}
+  .reel-symbol{
+    height:72px; width:72px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    font-size:34px; line-height:1;
+  }
+  .payline{position:absolute; left:-4px; right:-4px; top:50%; transform:translateY(-50%); z-index:3; display:flex; justify-content:space-between; pointer-events:none;}
+  .payline .pin{color:var(--amber); font-size:13px; filter:drop-shadow(0 0 4px rgba(34,197,94,.6));}
+  .slots-result{
+    text-align:center; margin:2px 0 14px; font-family:var(--mono); font-size:13px; color:var(--text-dim); min-height:18px;
+  }
+  .slots-result b{color:var(--text);}
+  .slots-result.win{color:var(--green); font-weight:600; font-size:14.5px;}
+  .slots-result.lose{color:var(--text-dim);}
+
+  .slots-bet-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:12px;}
+  .slots-bet-btn{
+    padding:12px 4px; border-radius:5px; border:1px solid var(--line); background:var(--panel);
+    color:var(--text); font-family:var(--mono); font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .slots-bet-btn:active{background:var(--panel-2); border-color:var(--amber-dim);}
+  .slots-bet-btn:disabled{opacity:.4;}
+  .slots-spin-btn{
+    width:100%; padding:15px; border:none; border-radius:6px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:15px; letter-spacing:.5px; text-transform:uppercase;
+  }
+  .slots-spin-btn:disabled{opacity:.5;}
+  .slots-again-row{display:flex; gap:8px; margin-top:4px;}
+  .slots-again-row .slots-spin-btn{flex:1;}
+
+  /* ---- Апгрейд ---- */
+  .upgrade-stage{
+    background:radial-gradient(600px 300px at 50% 0%, rgba(34,197,94,0.10), transparent 65%), var(--panel);
+    border:1px solid var(--line); border-radius:8px;
+    padding:18px 14px 16px; text-align:center; margin-bottom:14px;
+    transition:border-color .25s ease, box-shadow .25s ease;
+  }
+  .upgrade-stage.state-win{border-color:var(--green); box-shadow:0 0 0 1px var(--green), 0 0 22px rgba(22,163,74,.28);}
+  .upgrade-stage.state-lose{border-color:var(--red); box-shadow:0 0 0 1px var(--red), 0 0 22px rgba(239,68,68,.22);}
+  .upgrade-chance-bar{
+    position:relative; height:16px; border-radius:8px; overflow:hidden;
+    background:var(--red); border:1px solid var(--line);
+  }
+  .upgrade-chance-fill{
+    position:absolute; left:0; top:0; bottom:0; background:var(--green);
+    width:0%; transition:width .3s ease;
+  }
+  .upgrade-chance-marker{
+    position:absolute; top:-15px; left:0%; transform:translateX(-50%);
+    font-size:13px; color:var(--text); line-height:1;
+    transition:left 1.15s cubic-bezier(.17,.67,.2,1.15);
+  }
+  .upgrade-chance-roll{
+    position:absolute; top:-38px; left:0%; transform:translateX(-50%);
+    font-family:var(--mono); font-size:11px; font-weight:700; color:var(--text);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:4px;
+    padding:2px 7px; white-space:nowrap; opacity:0; pointer-events:none;
+    transition:left 1.15s cubic-bezier(.17,.67,.2,1.15), opacity .2s ease;
+  }
+  .upgrade-chance-roll::after{
+    content:''; position:absolute; left:50%; bottom:-4px; transform:translateX(-50%);
+    border:4px solid transparent; border-top-color:var(--line);
+  }
+  .upgrade-chance-roll.show{opacity:1;}
+  .upgrade-chance-roll.win{color:var(--green); border-color:var(--green);}
+  .upgrade-chance-roll.win::after{border-top-color:var(--green);}
+  .upgrade-chance-roll.lose{color:var(--red); border-color:var(--red);}
+  .upgrade-chance-roll.lose::after{border-top-color:var(--red);}
+  .upgrade-chance-labels{
+    display:flex; justify-content:space-between; margin-top:6px;
+    font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+  }
+  .upgrade-chance-labels .ok{color:var(--green);}
+  .upgrade-chance-labels .fail{color:var(--red);}
+  .upgrade-result{
+    margin-top:14px; font-family:var(--mono); font-size:13px; color:var(--text-dim); min-height:18px;
+  }
+  .upgrade-result b{color:var(--text);}
+  .upgrade-result.win{color:var(--green); font-weight:600; font-size:14.5px;}
+  .upgrade-result.lose{color:var(--red);}
+  .upgrade-error{
+    text-align:center; font-family:var(--mono); font-size:11.5px; color:var(--red);
+    margin-bottom:10px; min-height:14px;
+  }
+  .upgrade-summary{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--mono); font-size:12px; color:var(--text-dim);
+    padding:2px 2px 10px;
+  }
+  .upgrade-summary b{color:var(--amber);}
+  .upgrade-item-list{max-height:260px; overflow-y:auto; margin-bottom:12px; border-radius:6px;}
+  .upgrade-item-row{
+    display:flex; align-items:center; gap:10px; justify-content:space-between;
+    background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--line);
+    border-radius:6px; padding:9px 10px; margin-bottom:6px; cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .upgrade-item-row.rarity-militari{border-left-color:var(--blue);}
+  .upgrade-item-row.rarity-zapreshennoe{border-left-color:var(--purple);}
+  .upgrade-item-row.rarity-zasekrechennoe{border-left-color:var(--pink);}
+  .upgrade-item-row.rarity-taynoe{border-left-color:var(--red);}
+  .upgrade-item-row.rarity-redkiy{border-left-color:var(--amber);}
+  .upgrade-item-row.picked{background:var(--panel-2); border-color:var(--amber-dim);}
+  .upgrade-item-row.disabled{opacity:.35; cursor:default;}
+  .upgrade-item-check{
+    width:18px; height:18px; flex-shrink:0; border-radius:4px; border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--bg-0);
+  }
+  .upgrade-item-row.picked .upgrade-item-check{background:var(--amber); border-color:var(--amber); }
+  .upgrade-item-info{flex:1; min-width:0;}
+  .upgrade-item-name{font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .upgrade-item-rarity{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px;}
+  .upgrade-item-price{font-family:var(--mono); font-size:12.5px; color:var(--amber); white-space:nowrap; flex-shrink:0;}
+  .upgrade-mult-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-bottom:12px;}
+  .upgrade-mult-btn{
+    padding:12px 6px; border-radius:6px; border:1px solid var(--line); background:var(--panel);
+    color:var(--text); font-family:var(--mono); font-weight:600; font-size:13px; cursor:pointer; text-align:center;
+  }
+  .upgrade-mult-btn .chance{display:block; font-size:10.5px; color:var(--text-dim); margin-top:3px; font-weight:500;}
+  .upgrade-mult-btn:active{background:var(--panel-2); border-color:var(--amber-dim);}
+  .upgrade-mult-btn:disabled{opacity:.4;}
+  .upgrade-mult-btn.selected{
+    border-color:var(--amber); background:var(--panel-2);
+    box-shadow:0 0 0 1px var(--amber), 0 0 14px rgba(34,197,94,.25);
+  }
+  .upgrade-mult-btn.selected .chance{color:var(--amber);}
+  .upgrade-go-btn{
+    width:100%; padding:15px; border:none; border-radius:6px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:15px; letter-spacing:.5px; text-transform:uppercase;
+  }
+  .upgrade-go-btn:disabled{opacity:.5;}
+  .upgrade-secondary-btn{
+    width:100%; padding:13px; border-radius:6px; cursor:pointer; margin-top:4px;
+    background:none; border:1px solid var(--line); color:var(--text);
+    font-family:var(--sans); font-weight:600; font-size:13.5px; text-transform:uppercase; letter-spacing:.5px;
+  }
+
+  .paytable{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:4px 12px; margin-bottom:12px;
+  }
+  .paytable-head{
+    display:grid; grid-template-columns:1fr 104px; align-items:center;
+    font-family:var(--mono); font-size:10px; letter-spacing:1.5px; color:var(--text-dim);
+    text-transform:uppercase; padding:9px 0; border-bottom:1px solid var(--line);
+  }
+  .paytable-head span:last-child{display:grid; grid-template-columns:1fr 1fr; text-align:center;}
+  .paytable-row{
+    display:grid; grid-template-columns:1fr 104px; align-items:center; gap:10px;
+    padding:8px 0; border-bottom:1px solid var(--line);
+  }
+  .paytable-row:last-child{border-bottom:none;}
+  .paytable-left{display:flex; align-items:center; gap:10px; min-width:0;}
+  .paytable-icon{font-size:21px; width:26px; text-align:center; flex-shrink:0;}
+  .paytable-name{font-size:12.5px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
+  .paytable-mults{display:grid; grid-template-columns:1fr 1fr; font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+  .paytable-mults span{text-align:center;}
+  .paytable-mults b{color:var(--amber); font-weight:600;}
+  .paytable-mults .mult-lbl{font-size:9px; display:block; letter-spacing:.5px; color:var(--text-dim); text-align:center;}
+
+  /* ---- Магазин: кейсы ---- */
+  .case-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:14px; margin-bottom:10px;
+  }
+  .case-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .case-name{font-size:15.5px; font-weight:600;}
+  .case-price{font-family:var(--mono); color:var(--amber); font-size:13px; font-weight:600;}
+  .case-meta{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-bottom:10px; letter-spacing:.5px;}
+  .chip-row{display:flex; flex-wrap:wrap; gap:6px;}
+  .chip{
+    font-family:var(--mono); font-size:10.5px; padding:4px 8px; border-radius:3px;
+    background:var(--panel-2); border-left:2px solid var(--line); color:var(--text-dim);
+  }
+  .chip b{color:var(--text);}
+  .shop-hint{
+    text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+    margin-top:6px; padding-bottom:4px;
+  }
+  .case-open-btn{
+    width:100%; padding:11px; border:none; border-radius:5px; cursor:pointer; margin-top:4px;
+    background:var(--amber); color:var(--bg-0); font-family:var(--sans); font-weight:700;
+    font-size:13px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .case-open-btn:disabled{opacity:.5;}
+  .case-locked-note{
+    text-align:center; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+    margin-top:4px;
+  }
+
+  /* ---- Результат открытия кейса / покупки (оверлей) ---- */
+  .drop-overlay{
+    position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+    background:rgba(6,7,4,0.82); padding:24px; animation:fadein .2s ease;
+  }
+  .drop-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:26px 20px; text-align:center; max-width:320px; width:100%;
+    border-top:3px solid var(--amber);
+  }
+  .drop-card .drop-emoji{font-size:34px; margin-bottom:8px;}
+  .drop-card .drop-name{font-size:17px; font-weight:700; margin-bottom:4px;}
+  .drop-card .drop-rarity{font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:10px;}
+  .drop-card .drop-price{font-family:var(--mono); font-size:20px; color:var(--amber); font-weight:700; margin-bottom:16px;}
+  .drop-card .drop-close-btn{
+    width:100%; padding:12px; border:none; border-radius:6px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-weight:700; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:.5px;
+  }
+  .drop-card.multi{max-width:360px;}
+  .drop-multi-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px;}
+  .drop-multi-item{
+    background:var(--panel-2); border:1px solid var(--line); border-top:2px solid var(--line);
+    border-radius:6px; padding:8px 4px; text-align:center;
+  }
+  .drop-multi-item.rarity-militari{border-top-color:var(--blue);}
+  .drop-multi-item.rarity-zapreshennoe{border-top-color:var(--purple);}
+  .drop-multi-item.rarity-zasekrechennoe{border-top-color:var(--pink);}
+  .drop-multi-item.rarity-taynoe{border-top-color:var(--red);}
+  .drop-multi-item.rarity-redkiy{border-top-color:var(--amber);}
+  .drop-multi-item .emoji{font-size:20px;}
+  .drop-multi-item .name{font-size:10px; font-weight:600; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .drop-multi-item .price{font-family:var(--mono); font-size:10.5px; color:var(--amber); margin-top:2px;}
+  .drop-multi-total{font-family:var(--mono); font-size:13px; color:var(--text-dim); margin-bottom:14px;}
+  .drop-multi-total b{color:var(--amber);}
+
+  /* ---- Кейсы: прокрутка ленты, как в CS2 ---- */
+  .case-reel-overlay{background:rgba(6,7,4,0.9);}
+  .case-reel-wrap{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px 0; width:100%; max-width:360px;
+  }
+  .case-reel-title{
+    font-family:var(--mono); font-size:11px; letter-spacing:1.5px; color:var(--text-dim);
+    text-transform:uppercase; text-align:center; margin-bottom:12px;
+  }
+  .case-reel-viewport{
+    position:relative; height:104px; overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+    mask-image:linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+  }
+  .case-reel-pointer{
+    position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--amber);
+    transform:translateX(-50%); z-index:2; box-shadow:0 0 8px var(--amber);
+  }
+  .case-reel-pointer::before{
+    content:''; position:absolute; top:-1px; left:50%; transform:translateX(-50%);
+    border:6px solid transparent; border-top:8px solid var(--amber);
+  }
+  .case-reel-track{
+    position:absolute; top:0; left:50%; display:flex; align-items:center; gap:10px; height:100%;
+    will-change:transform;
+  }
+  .case-reel-card{
+    flex:0 0 84px; width:84px; height:88px; border-radius:6px;
+    background:var(--panel-2); border:1px solid var(--line); border-top:3px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    text-align:center; padding:4px;
+  }
+  .case-reel-card.rarity-militari{border-top-color:var(--blue);}
+  .case-reel-card.rarity-zapreshennoe{border-top-color:var(--purple);}
+  .case-reel-card.rarity-zasekrechennoe{border-top-color:var(--pink);}
+  .case-reel-card.rarity-taynoe{border-top-color:var(--red);}
+  .case-reel-card.rarity-redkiy{border-top-color:var(--amber);}
+  .case-reel-card .emoji{font-size:22px; line-height:1;}
+  .case-reel-card .name{
+    font-size:9px; color:var(--text-dim); line-height:1.15; overflow:hidden;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+  .case-reel-card .price{font-family:var(--mono); font-size:10px; color:var(--amber); font-weight:600;}
+
+  /* ---- Кейсы: несколько лент сразу (открытие пачкой х5) ---- */
+  .case-reel-wrap.multi{max-width:340px; padding:14px 0;}
+  .case-reel-lanes{display:flex; flex-direction:column; gap:8px; padding:0 14px;}
+  .case-reel-lane{position:relative;}
+  .case-reel-lane .case-reel-viewport{height:64px;}
+  .case-reel-lane .case-reel-pointer::before{border-width:5px; border-top-width:6px; top:-1px;}
+  .case-reel-lane .case-reel-track{gap:7px;}
+  .case-reel-lane .case-reel-card{
+    flex:0 0 60px; width:60px; height:64px; gap:2px; padding:3px;
+  }
+  .case-reel-lane .case-reel-card .emoji{font-size:16px;}
+  .case-reel-lane .case-reel-card .name{font-size:7.5px; -webkit-line-clamp:2;}
+  .case-reel-lane .case-reel-card .price{font-size:8.5px;}
+  .case-reel-lane.done .case-reel-pointer{box-shadow:0 0 10px var(--green); background:var(--green);}
+  .case-reel-lane.done .case-reel-pointer::before{border-top-color:var(--green);}
+  .case-open-row{display:flex; gap:8px; margin-top:4px;}
+  .case-open-row .case-open-btn{margin-top:0;}
+  .case-open-btn.x5{background:var(--panel-2); color:var(--amber); border:1px solid var(--amber-dim); flex:0 0 78px;}
+
+  /* ---- Магазин ---- */
+  .shop-item-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:14px; margin-bottom:10px; border-left:3px solid var(--purple);
+  }
+  .shop-item-card.locked{opacity:.55;}
+  .shop-item-name{font-size:14.5px; font-weight:600;}
+  .shop-item-rarity{font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:2px;}
+  .shop-item-row{display:flex; align-items:center; justify-content:space-between; margin-top:10px; gap:10px;}
+  .shop-item-price{font-family:var(--mono); color:var(--amber); font-weight:700; font-size:14px;}
+  .shop-buy-btn{
+    padding:9px 16px; border:none; border-radius:5px; cursor:pointer;
+    background:var(--amber); color:var(--bg-0); font-weight:700; font-size:12.5px;
+    text-transform:uppercase; letter-spacing:.5px; flex-shrink:0;
+  }
+  .shop-buy-btn:disabled{opacity:.5;}
+
+  /* ---- Инвентарь ---- */
+  .item-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    padding:10px 12px; margin-bottom:8px; border-left:3px solid var(--line);
+  }
+  .item-row.rarity-militari{border-left-color:var(--blue);}
+  .item-row.rarity-zapreshennoe{border-left-color:var(--purple);}
+  .item-row.rarity-zasekrechennoe{border-left-color:var(--pink);}
+  .item-row.rarity-taynoe{border-left-color:var(--red);}
+  .item-row.rarity-redkiy{border-left-color:var(--amber);}
+  .item-row.protected{border-left-color:var(--green); background:var(--panel-2);}
+  .item-name{font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .item-rarity{font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px;}
+  .item-right{display:flex; align-items:center; gap:8px; flex-shrink:0;}
+  .item-price{font-family:var(--mono); font-size:13px; color:var(--amber); white-space:nowrap;}
+  .lock-btn{
+    width:28px; height:28px; border-radius:4px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--text-dim); font-size:13px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; cursor:pointer;
+  }
+  .lock-btn.on{border-color:var(--green); color:var(--green); background:rgba(22,163,74,.12);}
+  .sell-btn{
+    width:28px; height:28px; border-radius:4px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--text-dim); font-size:13px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; cursor:pointer;
+  }
+  .sell-btn:disabled{opacity:.3; cursor:default;}
+  .inv-summary{
+    display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px;
+    color:var(--text-dim); margin-bottom:10px; padding:0 2px;
+  }
+  .inv-summary b{color:var(--text);}
+  .sell-all-btn{
+    width:100%; padding:11px; margin-bottom:12px; border-radius:5px; cursor:pointer;
+    background:none; border:1px solid var(--red); color:var(--red);
+    font-family:var(--sans); font-weight:700; font-size:12.5px;
+    text-transform:uppercase; letter-spacing:.5px;
+  }
+  .sell-all-btn:active{background:rgba(239,68,68,.12);}
+  .sell-all-btn:disabled{opacity:.5;}
+
+  /* ---- Профиль ---- */
+  .profile-stat-list{background:var(--panel); border:1px solid var(--line); border-radius:4px; overflow:hidden;}
+  .profile-stat-row{
+    display:flex; justify-content:space-between; padding:11px 14px;
+    border-bottom:1px solid var(--line); font-size:13.5px;
+  }
+  .profile-stat-row:last-child{border-bottom:none;}
+  .profile-stat-row .k{color:var(--text-dim);}
+  .profile-stat-row .v{font-family:var(--mono); font-weight:600; color:var(--text);}
+  .best-item-panel{
+    margin-top:12px; background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--amber);
+    border-radius:4px; padding:12px 14px;
+  }
+  .best-item-panel .lbl{font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:1.5px; text-transform:uppercase;}
+  .best-item-panel .name{font-size:15px; font-weight:600; margin-top:4px;}
+  .best-item-panel .price{font-family:var(--mono); color:var(--amber); font-size:13px; margin-top:2px;}
+
+  /* ---- Топ ---- */
+  .top-switch{
+    display:flex; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:3px; gap:3px; margin-bottom:12px;
+  }
+  .top-switch button{
+    flex:1; padding:9px 4px; border:none; border-radius:4px; background:none;
+    color:var(--text-dim); font-family:var(--sans); font-size:11.5px; font-weight:600;
+    cursor:pointer; text-align:center;
+  }
+  .top-switch button.active{background:var(--amber-dim); color:var(--bg-0);}
+  .top-row{
+    display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line);
+    border-radius:4px; padding:10px 12px; margin-bottom:6px;
+  }
+  .top-rank{
+    font-family:var(--mono); font-weight:700; font-size:13px; color:var(--text-dim);
+    width:22px; text-align:center; flex-shrink:0;
+  }
+  .top-row:nth-child(1) .top-rank{color:var(--amber);}
+  .top-name{flex:1; font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .top-val{font-family:var(--mono); font-size:13px; color:var(--amber); flex-shrink:0;}
+
+  nav.tabbar{
+    position:fixed; left:0; right:0; bottom:0;
+    background:var(--bg-1); border-top:1px solid var(--line);
+    display:flex; padding:5px 2px calc(5px + env(safe-area-inset-bottom));
+    z-index:10;
+  }
+  .tab{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:2px;
+    padding:5px 1px; border:none; background:none; color:var(--text-dim);
+    font-family:var(--sans); font-size:8.5px; font-weight:600; letter-spacing:0;
+    text-transform:uppercase; cursor:pointer; line-height:1.1; text-align:center;
+  }
+  .tab .icon{font-size:17px; line-height:1;}
+  .tab.active{color:var(--amber);}
+  .tab.active .icon{filter:drop-shadow(0 0 4px rgba(34,197,94,.55));}
+</style>
+</head>
+<body>
+
+<header class="hud">
+  <div class="profile-card" id="profile-card">
+    <div class="loading-line" id="loading-line" style="flex:1;">подключение к серверу…</div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ГЛАВНАЯ -->
+  <div class="view active" id="view-home">
+    <div class="section-title">Главная</div>
+    <div class="stat-grid" id="home-stats">
+      <div class="loading-line" style="grid-column:1/-1;">загрузка статистики…</div>
+    </div>
+
+    <div class="section-title spaced">Разделы</div>
+    <div class="quick-grid">
+      <div class="quick-card" data-goto="games"><span class="icon">🎮</span><div class="name">Игры</div></div>
+      <div class="quick-card" data-goto="cases"><span class="icon">📦</span><div class="name">Кейсы</div></div>
+      <div class="quick-card" data-goto="shop"><span class="icon">🛒</span><div class="name">Магазин</div></div>
+      <div class="quick-card" data-goto="inventory"><span class="icon">🎒</span><div class="name">Инвентарь</div></div>
+    </div>
+
+  </div>
+
+  <!-- ИГРЫ -->
+  <div class="view" id="view-games">
+    <div id="games-list">
+      <div class="section-title">Игры</div>
+
+      <div class="game-row">
+        <div class="game-tile crash" data-game="crash">
+          <span class="icon">📈</span>
+          <div class="name">Crash</div>
+        </div>
+        <div class="game-tile upgrade" data-game="upgrade">
+          <span class="icon">⚡</span>
+          <div class="name">Апгрейд</div>
+        </div>
+        <div class="game-tile slots" data-game="slots">
+          <span class="icon">🎰</span>
+          <div class="name">Слоты</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="games-detail" class="hidden">
+      <button class="subview-back" id="games-back-btn">‹ Все игры</button>
+      <div class="placeholder-panel" id="games-detail-body"></div>
+    </div>
+
+    <div id="crash-game" class="hidden">
+      <button class="subview-back" id="crash-back-btn">‹ Все игры</button>
+
+      <div class="crash-stage" id="crash-stage">
+        <div class="crash-coef" id="crash-coef">x1.00</div>
+        <div class="crash-sub" id="crash-sub">Выбери ставку, чтобы начать раунд</div>
+        <div class="crash-status-line" id="crash-status-line"></div>
+      </div>
+
+      <div class="crash-error" id="crash-error"></div>
+
+      <div id="crash-panel"></div>
+    </div>
+
+    <div id="slots-game" class="hidden">
+      <button class="subview-back" id="slots-back-btn">‹ Все игры</button>
+
+      <div class="slots-stage" id="slots-stage">
+        <div class="slots-frame">
+          <div class="reel-window" id="reel-0"><div class="reel-strip"></div></div>
+          <div class="reel-window" id="reel-1"><div class="reel-strip"></div></div>
+          <div class="reel-window" id="reel-2"><div class="reel-strip"></div></div>
+          <div class="payline"><span class="pin left">▶</span><span class="pin right">◀</span></div>
+        </div>
+      </div>
+
+      <div class="crash-error" id="slots-error"></div>
+
+      <div id="slots-panel"></div>
+
+      <div class="slots-result" id="slots-result">Выбери ставку и крути барабан</div>
+
+      <div class="paytable" id="slots-paytable"></div>
+    </div>
+
+    <div id="upgrade-game" class="hidden">
+      <button class="subview-back" id="upgrade-back-btn">‹ Все игры</button>
+
+      <div class="upgrade-stage" id="upgrade-stage">
+        <div class="upgrade-chance-bar" id="upgrade-chance-bar">
+          <div class="upgrade-chance-fill" id="upgrade-chance-fill"></div>
+          <div class="upgrade-chance-roll" id="upgrade-chance-roll"></div>
+          <div class="upgrade-chance-marker" id="upgrade-chance-marker">▲</div>
+        </div>
+        <div class="upgrade-chance-labels">
+          <span class="ok">успех</span><span class="fail">сгорит</span>
+        </div>
+        <div class="upgrade-result" id="upgrade-result">Выбери предметы из инвентаря снизу</div>
+      </div>
+
+      <div class="upgrade-error" id="upgrade-error"></div>
+
+      <div id="upgrade-panel"></div>
+    </div>
+  </div>
+
+  <!-- КЕЙСЫ -->
+  <div class="view" id="view-cases">
+    <div class="section-title">Кейсы</div>
+    <div id="cases-list">
+      <div class="loading-line">загрузка кейсов…</div>
+    </div>
+  </div>
+
+  <!-- МАГАЗИН -->
+  <div class="view" id="view-shop">
+    <div class="section-title">Магазин</div>
+    <div id="shop-list">
+      <div class="loading-line">загрузка магазина…</div>
+    </div>
+  </div>
+
+  <!-- ИНВЕНТАРЬ -->
+  <div class="view" id="view-inventory">
+    <div class="section-title">Инвентарь</div>
+    <div id="inventory-list">
+      <div class="loading-line">загрузка инвентаря…</div>
+    </div>
+  </div>
+
+  <!-- ПРОФИЛЬ -->
+  <div class="view" id="view-profile">
+    <div class="section-title">Профиль</div>
+    <div id="profile-stats">
+      <div class="loading-line">загрузка профиля…</div>
+    </div>
+  </div>
+
+  <!-- ТОП -->
+  <div class="view" id="view-top">
+    <div class="section-title">Топ игроков</div>
+    <div class="top-switch" id="top-switch">
+      <button class="active" data-top="coins">Монеты</button>
+      <button data-top="level">Уровень</button>
+      <button data-top="item">Дорогой дроп</button>
+    </div>
+    <div id="top-list">
+      <div class="placeholder-panel">
+        <span class="big">🏆</span>
+        Рейтинги подключаются к общей базе бота на Этапе 3.<br>
+        Здесь появятся три отдельных топа с быстрым переключением.
+        <div class="stage-note">Этап 3</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<nav class="tabbar">
+  <button class="tab active" data-tab="home"><span class="icon">🏠</span>Главная</button>
+  <button class="tab" data-tab="games"><span class="icon">🎮</span>Игры</button>
+  <button class="tab" data-tab="cases"><span class="icon">📦</span>Кейсы</button>
+  <button class="tab" data-tab="shop"><span class="icon">🛒</span>Магазин</button>
+  <button class="tab" data-tab="inventory"><span class="icon">🎒</span>Инвентарь</button>
+  <button class="tab" data-tab="profile"><span class="icon">👤</span>Профиль</button>
+  <button class="tab" data-tab="top"><span class="icon">🏆</span>Топ</button>
+</nav>
+
+<script>
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    if (tg.setHeaderColor) tg.setHeaderColor('#f3f6f4');
+    if (tg.setBackgroundColor) tg.setBackgroundColor('#f3f6f4');
+  }
+
+  const initData = tg?.initData || '';
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
+  }
+
+  function fmt(n) {
+    return Number(n || 0).toLocaleString('ru-RU');
+  }
+
+  // Ключ для CSS-класса рамки по редкости предмета (соответствует
+  // RARITY_EMOJI в handlers/cases.py и handlers/inventory.py).
+  function rarityClass(rarity) {
+    const map = {
+      'Милитари': 'rarity-militari',
+      'Запрещённое': 'rarity-zapreshennoe',
+      'Засекреченное': 'rarity-zasekrechennoe',
+      'Тайное': 'rarity-taynoe',
+      'Редкий спецпредмет': 'rarity-redkiy',
+    };
+    return map[rarity] || '';
+  }
+
+  async function apiGet(path) {
+    const res = await fetch(path, { headers: { 'X-Telegram-Init-Data': initData } });
+    if (!res.ok) throw new Error('request_failed:' + path);
+    return res.json();
+  }
+
+  // ---------- Шапка профиля ----------
+  let meData = null;
+  async function loadProfile() {
+    const card = document.getElementById('profile-card');
+    try {
+      const data = await apiGet('/api/me');
+      meData = data;
+      const initials = (data.username || '?').slice(0, 2).toUpperCase();
+      const xpPercent = data.xp_needed ? Math.min(100, Math.round((data.xp / data.xp_needed) * 100)) : 0;
+
+      card.innerHTML = `
+        <div class="avatar">${initials}</div>
+        <div class="profile-info">
+          <div class="profile-name">${escapeHtml(data.username)}</div>
+          <div class="profile-meta">
+            <span>УРОВЕНЬ <b>${data.level}</b></span>
+            <span>XP <b>${data.xp}</b>/${data.xp_needed}</span>
+          </div>
+          <div class="xp-track"><div class="xp-fill" style="width:${xpPercent}%"></div></div>
+        </div>
+        <div class="balance">
+          <div class="num">${fmt(data.balance)}</div>
+          <div class="lbl">монет</div>
+        </div>
+      `;
+    } catch (e) {
+      card.innerHTML = `<div class="loading-line" style="flex:1; color:var(--red);">
+        не удалось получить данные — открой Web App через кнопку в боте, не в обычном браузере
+      </div>`;
+    }
+  }
+
+  // ---------- Главная ----------
+  let statsCache = null;
+  async function getStats() {
+    if (!statsCache) statsCache = await apiGet('/api/stats');
+    return statsCache;
+  }
+
+  async function renderHome() {
+    const el = document.getElementById('home-stats');
+    try {
+      const s = await getStats();
+      el.innerHTML = `
+        <div class="stat-card"><div class="val">${fmt(s.total_earned)}</div><div class="lbl">Заработано всего</div></div>
+        <div class="stat-card"><div class="val">${fmt(s.cases_opened)}</div><div class="lbl">Кейсов открыто</div></div>
+        <div class="stat-card"><div class="val">${fmt(s.duels_played)}</div><div class="lbl">Дуэлей сыграно</div></div>
+        <div class="stat-card"><div class="val">${fmt(s.upgrades_success)}</div><div class="lbl">Апгрейдов успешно</div></div>
+      `;
+    } catch (e) {
+      el.innerHTML = `<div class="error-line" style="grid-column:1/-1;">не удалось загрузить статистику</div>`;
+    }
+  }
+
+  // ---------- Игры ----------
+  // Crash, Слоты и Апгрейд работают на реальной логике (см. секции ниже,
+  // а сам расчёт — в webserver.py). GAME_INFO больше не нужен — заглушек
+  // не осталось.
+  const GAME_INFO = {};
+
+  const gamesListEl = document.getElementById('games-list');
+  const gamesDetailEl = document.getElementById('games-detail');
+  const gamesDetailBody = document.getElementById('games-detail-body');
+  const crashGameEl = document.getElementById('crash-game');
+  const slotsGameEl = document.getElementById('slots-game');
+  const upgradeGameEl = document.getElementById('upgrade-game');
+
+  function hideAllGameScreens() {
+    gamesListEl.classList.add('hidden');
+    gamesDetailEl.classList.add('hidden');
+    crashGameEl.classList.add('hidden');
+    slotsGameEl.classList.add('hidden');
+    upgradeGameEl.classList.add('hidden');
+  }
+
+  function openGame(key) {
+    if (key === 'crash') {
+      hideAllGameScreens();
+      crashGameEl.classList.remove('hidden');
+      initCrashView();
+      return;
+    }
+    if (key === 'slots') {
+      hideAllGameScreens();
+      slotsGameEl.classList.remove('hidden');
+      initSlotsView();
+      return;
+    }
+    if (key === 'upgrade') {
+      hideAllGameScreens();
+      upgradeGameEl.classList.remove('hidden');
+      initUpgradeView();
+      return;
+    }
+    const g = GAME_INFO[key];
+    if (!g) return;
+    gamesDetailBody.innerHTML = `
+      <span class="big">${g.icon}</span>
+      <b style="color:var(--text); font-size:15px; display:block; margin-bottom:6px;">${g.title}</b>
+      ${g.body}
+      <div class="stage-note">Скоро</div>
+    `;
+    hideAllGameScreens();
+    gamesDetailEl.classList.remove('hidden');
+  }
+
+  document.querySelectorAll('.game-tile').forEach(card => {
+    card.addEventListener('click', () => {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      if (card.dataset.gotoTab) {
+        goToTab(card.dataset.gotoTab);
+        return;
+      }
+      openGame(card.dataset.game);
+    });
+  });
+
+  document.getElementById('games-back-btn').addEventListener('click', () => {
+    stopCrashLoops();
+    stopUpgradeAnimation();
+    hideAllGameScreens();
+    gamesListEl.classList.remove('hidden');
+  });
+
+  document.getElementById('upgrade-back-btn').addEventListener('click', () => {
+    stopUpgradeAnimation();
+    hideAllGameScreens();
+    gamesListEl.classList.remove('hidden');
+  });
+
+  document.getElementById('crash-back-btn').addEventListener('click', () => {
+    stopCrashLoops();
+    hideAllGameScreens();
+    gamesListEl.classList.remove('hidden');
+  });
+
+  document.getElementById('slots-back-btn').addEventListener('click', () => {
+    hideAllGameScreens();
+    gamesListEl.classList.remove('hidden');
+  });
+
+  function resetGamesView() {
+    stopCrashLoops();
+    stopUpgradeAnimation();
+    hideAllGameScreens();
+    gamesListEl.classList.remove('hidden');
+  }
+
+  // ---------- Crash ----------
+  // Игра честно посчитана на сервере (webserver.py): точка краха
+  // генерируется той же функцией, что использует бот (generate_crash_point
+  // из handlers/crash.py), а выплата на кэшауте всегда считается по
+  // серверному времени раунда — клиент не может подделать множитель.
+  // Здесь только гладкая визуализация: локально считаем ту же формулу
+  // роста по прошедшему времени (requestAnimationFrame, ~60 кадров/сек),
+  // а лёгкий поллинг раз в ~500мс сверяется с сервером и ловит момент
+  // краха, если игрок не успел забрать вручную.
+  const crashStageEl = document.getElementById('crash-stage');
+  const crashCoefEl = document.getElementById('crash-coef');
+  const crashSubEl = document.getElementById('crash-sub');
+  const crashStatusEl = document.getElementById('crash-status-line');
+  const crashErrorEl = document.getElementById('crash-error');
+  const crashPanelEl = document.getElementById('crash-panel');
+
+  let crashCfg = { betOptions: [], tickSeconds: 0.7, growthPerTick: 0.06 };
+  let crashRound = null; // { bet, startTime } пока раунд активен
+  let crashRafId = null;
+  let crashPollId = null;
+
+  function stopCrashLoops() {
+    if (crashRafId) cancelAnimationFrame(crashRafId);
+    if (crashPollId) clearInterval(crashPollId);
+    crashRafId = null;
+    crashPollId = null;
+  }
+
+  function crashMultiplierAt(elapsedSeconds) {
+    if (elapsedSeconds <= 0) return 1;
+    const ticks = elapsedSeconds / crashCfg.tickSeconds;
+    return Math.pow(1 + crashCfg.growthPerTick, ticks);
+  }
+
+  // Обратная функция: по множителю находим, сколько секунд должно было
+  // пройти, чтобы получить именно такое значение. Нужна для ресинхронизации
+  // локальной анимации с "настоящим" (серверным) множителем — без этого
+  // при небольшом расхождении часов устройства с сервером число на экране
+  // могло медленно уплывать от реального значения, на которое рассчитывается
+  // выплата при кэшауте.
+  function elapsedForMultiplier(mult) {
+    if (mult <= 1) return 0;
+    return crashCfg.tickSeconds * Math.log(mult) / Math.log(1 + crashCfg.growthPerTick);
+  }
+
+  // "Одометр": перерисовываем только те символы, которые реально
+  // изменились, и проигрываем на них короткую анимацию — это и даёт
+  // эффект электронного табло, где каждая цифра тикает отдельно.
+  function updateCoefDisplay(text) {
+    const prev = crashCoefEl.dataset.prevText || '';
+    if (text.length !== prev.length || crashCoefEl.children.length !== text.length) {
+      crashCoefEl.innerHTML = [...text].map(ch => `<span class="digit">${ch}</span>`).join('');
+    } else {
+      const spans = crashCoefEl.children;
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] !== prev[i]) {
+          spans[i].textContent = text[i];
+          spans[i].classList.remove('tick');
+          void spans[i].offsetWidth; // рестарт CSS-анимации
+          spans[i].classList.add('tick');
+        }
+      }
+    }
+    crashCoefEl.dataset.prevText = text;
+  }
+
+  function setCrashStageState(cls) {
+    crashStageEl.classList.remove('state-crashed', 'state-won');
+    if (cls) crashStageEl.classList.add(cls);
+  }
+
+  function renderBettingPanel() {
+    setCrashStageState(null);
+    updateCoefDisplay('x1.00');
+    crashSubEl.innerHTML = 'Выбери ставку, чтобы начать раунд';
+    crashStatusEl.textContent = '';
+    crashStatusEl.className = 'crash-status-line';
+    crashErrorEl.textContent = '';
+
+    crashPanelEl.innerHTML = `
+      <div class="crash-bet-grid" id="crash-bet-grid">
+        ${crashCfg.betOptions.map(b => `<button class="crash-bet-btn" data-bet="${b}">${fmt(b)}</button>`).join('')}
+      </div>
+    `;
+    crashPanelEl.querySelectorAll('.crash-bet-btn').forEach(btn => {
+      btn.addEventListener('click', () => placeBet(Number(btn.dataset.bet)));
+    });
+  }
+
+  async function placeBet(bet) {
+    crashErrorEl.textContent = '';
+    crashPanelEl.querySelectorAll('.crash-bet-btn').forEach(b => b.disabled = true);
+    try {
+      const res = await fetch('/api/crash/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ bet }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        crashErrorEl.textContent = data.error === 'insufficient_balance'
+          ? 'Недостаточно монет для этой ставки.'
+          : 'Не удалось начать раунд, попробуй ещё раз.';
+        crashPanelEl.querySelectorAll('.crash-bet-btn').forEach(b => b.disabled = false);
+        return;
+      }
+      loadProfile();
+      // Раунд только что создан на сервере, поэтому реально прошедшее
+      // время ~0 — берём локальное время получения ответа как точку
+      // отсчёта, а не сырой server-side timestamp. Так множитель всегда
+      // стартует ровно с x1.00, независимо от расхождения часов клиента
+      // и сервера или задержки сети на этом запросе (иначе первый кадр
+      // мог показать сразу x1.3x и выше — множитель "спрыгивал" вперёд).
+      crashRound = { bet: data.bet, startTime: Date.now() };
+      renderRunningPanel();
+      startCrashAnimation();
+    } catch (e) {
+      crashErrorEl.textContent = 'Нет связи с сервером.';
+      crashPanelEl.querySelectorAll('.crash-bet-btn').forEach(b => b.disabled = false);
+    }
+  }
+
+  function renderRunningPanel() {
+    setCrashStageState(null);
+    crashStatusEl.textContent = '';
+    crashStatusEl.className = 'crash-status-line';
+    crashPanelEl.innerHTML = `<button class="crash-cashout-btn" id="crash-cashout-btn">💸 Забрать</button>`;
+    document.getElementById('crash-cashout-btn').addEventListener('click', callCashout);
+  }
+
+  function startCrashAnimation() {
+    stopCrashLoops();
+
+    function frame() {
+      if (!crashRound) return;
+      const elapsed = (Date.now() - crashRound.startTime) / 1000;
+      const mult = crashMultiplierAt(elapsed);
+      updateCoefDisplay('x' + mult.toFixed(2));
+      crashSubEl.innerHTML = `Возможный выигрыш: <b>${fmt(Math.floor(crashRound.bet * mult))}</b> монет`;
+      crashRafId = requestAnimationFrame(frame);
+    }
+    frame();
+
+    // Лёгкий поллинг — только чтобы поймать крах, если не успели
+    // нажать "Забрать" вручную; сам множитель выше уже считается локально.
+    crashPollId = setInterval(async () => {
+      if (!crashRound) return;
+      try {
+        const state = await apiGet('/api/crash/state');
+        if (state.crashed) {
+          finishAsCrash(state.crash_point, state.bet);
+        } else if (!state.active) {
+          // Раунд закрылся не через наш кэшаут (например, из другой
+          // вкладки) — просто вернёмся к экрану ставки.
+          crashRound = null;
+          stopCrashLoops();
+          renderBettingPanel();
+        } else if (typeof state.multiplier === 'number') {
+          // Ресинхронизация: пересчитываем "виртуальный" startTime так,
+          // чтобы локальная формула в эту секунду выдавала ровно то
+          // значение, которое подтвердил сервер — реальный x, без
+          // накопленного расхождения из-за часов устройства.
+          const realElapsed = elapsedForMultiplier(state.multiplier);
+          crashRound.startTime = Date.now() - realElapsed * 1000;
+        }
+      } catch (e) {
+        // сеть моргнула — подождём следующего поллинга
+      }
+    }, 500);
+  }
+
+  async function callCashout() {
+    const btn = document.getElementById('crash-cashout-btn');
+    if (btn) btn.disabled = true;
+    stopCrashLoops();
+    try {
+      const res = await fetch('/api/crash/cashout', {
+        method: 'POST',
+        headers: { 'X-Telegram-Init-Data': initData },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // Раунд уже кем-то закрыт (например, поймали крах поллингом) —
+        // просто перечитаем состояние.
+        initCrashView();
+        return;
+      }
+      if (data.crashed) {
+        finishAsCrash(data.crash_point, data.bet);
+      } else {
+        finishAsWin(data.multiplier, data.payout, data.bet);
+      }
+      loadProfile();
+      statsCache = null;
+    } catch (e) {
+      crashErrorEl.textContent = 'Нет связи с сервером — открой вкладку заново.';
+    }
+  }
+
+  function finishAsCrash(crashPoint, bet) {
+    stopCrashLoops();
+    crashRound = null;
+    setCrashStageState('state-crashed');
+    updateCoefDisplay('x' + Number(crashPoint).toFixed(2));
+    crashSubEl.textContent = '';
+    crashStatusEl.className = 'crash-status-line crashed';
+    crashStatusEl.textContent = `💥 Крах! Ставка ${fmt(bet)} монет сгорела.`;
+    crashPanelEl.innerHTML = `<button class="crash-again-btn" id="crash-again-btn">Играть снова</button>`;
+    document.getElementById('crash-again-btn').addEventListener('click', renderBettingPanel);
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+  }
+
+  function finishAsWin(multiplier, payout, bet) {
+    stopCrashLoops();
+    crashRound = null;
+    setCrashStageState('state-won');
+    updateCoefDisplay('x' + Number(multiplier).toFixed(2));
+    crashSubEl.textContent = '';
+    crashStatusEl.className = 'crash-status-line won';
+    crashStatusEl.textContent = `💸 Забрал! Выигрыш ${fmt(payout)} монет (ставка была ${fmt(bet)}).`;
+    crashPanelEl.innerHTML = `<button class="crash-again-btn" id="crash-again-btn">Играть снова</button>`;
+    document.getElementById('crash-again-btn').addEventListener('click', renderBettingPanel);
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  async function initCrashView() {
+    stopCrashLoops();
+    crashErrorEl.textContent = '';
+    crashSubEl.textContent = 'подключение к серверу…';
+    crashPanelEl.innerHTML = '';
+    try {
+      const state = await apiGet('/api/crash/state');
+      crashCfg = {
+        betOptions: state.bet_options,
+        tickSeconds: state.tick_seconds,
+        growthPerTick: state.growth_per_tick,
+      };
+      if (state.active && state.crashed) {
+        finishAsCrash(state.crash_point, state.bet);
+      } else if (state.active) {
+        // Тут раунд уже идёт какое-то время, поэтому x1.00 не годится —
+        // но по той же причине, что и выше, не берём сырой server-side
+        // start_time напрямую. Вместо этого пересчитываем "виртуальный"
+        // локальный startTime из актуального множителя, который прислал
+        // сервер (state.multiplier) — тем же способом, что и ресинхронизация
+        // в поллинге ниже. Это застраховано от расхождения часов.
+        const realElapsed = elapsedForMultiplier(state.multiplier);
+        crashRound = { bet: state.bet, startTime: Date.now() - realElapsed * 1000 };
+        renderRunningPanel();
+        startCrashAnimation();
+      } else {
+        renderBettingPanel();
+      }
+    } catch (e) {
+      crashSubEl.textContent = '';
+      crashErrorEl.textContent = 'Не удалось загрузить Crash — попробуй открыть раздел ещё раз.';
+    }
+  }
+
+  // ---------- Слоты ----------
+  // Итог (какие символы выпали и выигрыш) целиком считает сервер
+  // (webserver.py: handle_slots_spin) — здесь только красивая визуализация:
+  // каждый барабан "прокручивается" через CSS-transform по длинной полосе
+  // случайных символов и тормозит ровно на символе, который прислал сервер.
+  const slotsStageEl = document.getElementById('slots-stage');
+  const slotsResultEl = document.getElementById('slots-result');
+  const slotsErrorEl = document.getElementById('slots-error');
+  const slotsPanelEl = document.getElementById('slots-panel');
+  const reelEls = [0, 1, 2].map(i => document.getElementById('reel-' + i));
+
+  let slotsCfg = null; // { betOptions, symbols: [{id, icon}] }
+  let slotsSpinning = false;
+
+  const REEL_ITEM_H = 72;
+  const REEL_FILLER_COUNT = 22; // сколько "лишних" символов промотать перед итогом
+  const REEL_DURATIONS = [900, 1200, 1550]; // мс — барабаны тормозят по очереди
+
+  async function loadSlotsConfig() {
+    if (slotsCfg) return slotsCfg;
+    const data = await apiGet('/api/slots/config');
+    slotsCfg = { betOptions: data.bet_options, symbols: data.symbols };
+    return slotsCfg;
+  }
+
+  function randomIcon() {
+    const pool = slotsCfg.symbols;
+    return pool[Math.floor(Math.random() * pool.length)].icon;
+  }
+
+  function primeReel(reelEl, icon) {
+    // Ставим барабан в состояние покоя с нужным символом по центру окна,
+    // без анимации (используется при открытии вкладки и сразу после спина).
+    const strip = reelEl.querySelector('.reel-strip');
+    strip.style.transition = 'none';
+    strip.innerHTML = `<div class="reel-symbol">${icon}</div>`;
+    strip.style.transform = 'translateY(0)';
+  }
+
+  function spinReel(reelEl, finalIcon, duration) {
+    return new Promise(resolve => {
+      const strip = reelEl.querySelector('.reel-strip');
+      const items = [];
+      for (let i = 0; i < REEL_FILLER_COUNT; i++) items.push(randomIcon());
+      items.push(finalIcon);
+
+      strip.style.transition = 'none';
+      strip.innerHTML = items.map(ic => `<div class="reel-symbol">${ic}</div>`).join('');
+      strip.style.transform = 'translateY(0)';
+      // eslint-disable-next-line no-unused-expressions
+      strip.offsetHeight; // форсируем reflow, чтобы transition ниже точно применился
+
+      const targetY = -(items.length - 1) * REEL_ITEM_H;
+      strip.style.transition = `transform ${duration}ms cubic-bezier(.13,.66,.24,1)`;
+      strip.style.transform = `translateY(${targetY}px)`;
+
+      setTimeout(resolve, duration);
+    });
+  }
+
+  function renderSlotsBetPanel() {
+    slotsStageEl.classList.remove('state-win', 'state-lose');
+    slotsResultEl.className = 'slots-result';
+    slotsResultEl.textContent = 'Выбери ставку и крути барабан';
+    slotsErrorEl.textContent = '';
+    slotsPanelEl.innerHTML = `
+      <div class="slots-bet-grid" id="slots-bet-grid">
+        ${slotsCfg.betOptions.map(b => `<button class="slots-bet-btn" data-bet="${b}">${fmt(b)}</button>`).join('')}
+      </div>
+    `;
+    slotsPanelEl.querySelectorAll('.slots-bet-btn').forEach(btn => {
+      btn.addEventListener('click', () => doSlotsSpin(Number(btn.dataset.bet)));
+    });
+  }
+
+  async function doSlotsSpin(bet) {
+    if (slotsSpinning) return;
+    slotsSpinning = true;
+    slotsErrorEl.textContent = '';
+    slotsStageEl.classList.remove('state-win', 'state-lose');
+    slotsResultEl.className = 'slots-result';
+    slotsResultEl.textContent = 'Крутим…';
+    slotsPanelEl.innerHTML = `<button class="slots-spin-btn" disabled>🎰 Крутится…</button>`;
+
+    try {
+      const res = await fetch('/api/slots/spin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ bet }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        slotsErrorEl.textContent = data.error === 'insufficient_balance'
+          ? 'Недостаточно монет для этой ставки.'
+          : 'Не удалось запустить спин, попробуй ещё раз.';
+        slotsSpinning = false;
+        renderSlotsBetPanel();
+        return;
+      }
+
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      await Promise.all(reelEls.map((el, i) => spinReel(el, data.reels[i].icon, REEL_DURATIONS[i])));
+
+      // Баланс наверху обновляем только сейчас, ПОСЛЕ того как барабаны
+      // остановились и результат виден — иначе цифра в шапке скакала бы
+      // раньше, чем игрок увидит, что выпало.
+      loadProfile();
+      statsCache = null;
+
+      if (data.payout > 0) {
+        slotsStageEl.classList.add('state-win');
+        slotsResultEl.className = 'slots-result win';
+        slotsResultEl.innerHTML = data.combo === 'triple'
+          ? `🎉 Три в ряд! Выигрыш <b>${fmt(data.payout)}</b> монет`
+          : `✨ Совпадение! Выигрыш <b>${fmt(data.payout)}</b> монет`;
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        slotsStageEl.classList.add('state-lose');
+        slotsResultEl.className = 'slots-result lose';
+        slotsResultEl.textContent = `Пусто. Ставка ${fmt(data.bet)} монет сгорела.`;
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+      }
+
+      slotsPanelEl.innerHTML = `
+        <div class="slots-again-row">
+          <button class="slots-spin-btn" id="slots-repeat-btn">Ещё раз ${fmt(bet)}</button>
+        </div>
+        <div class="slots-bet-grid" id="slots-bet-grid" style="margin-top:8px;">
+          ${slotsCfg.betOptions.map(b => `<button class="slots-bet-btn" data-bet="${b}">${fmt(b)}</button>`).join('')}
+        </div>
+      `;
+      document.getElementById('slots-repeat-btn').addEventListener('click', () => doSlotsSpin(bet));
+      slotsPanelEl.querySelectorAll('.slots-bet-btn').forEach(btn => {
+        btn.addEventListener('click', () => doSlotsSpin(Number(btn.dataset.bet)));
+      });
+    } catch (e) {
+      slotsErrorEl.textContent = 'Нет связи с сервером.';
+      renderSlotsBetPanel();
+    } finally {
+      slotsSpinning = false;
+    }
+  }
+
+  function renderSlotsPaytable() {
+    const el = document.getElementById('slots-paytable');
+    const sorted = [...slotsCfg.symbols].sort((a, b) => b.payout - a.payout);
+    el.innerHTML = `
+      <div class="paytable-head">
+        <span>Символ</span>
+        <span><span>3 в ряд</span><span>2 из 3</span></span>
+      </div>
+      ${sorted.map(s => `
+        <div class="paytable-row">
+          <div class="paytable-left">
+            <span class="paytable-icon">${s.icon}</span>
+            <span class="paytable-name">${escapeHtml(s.name)}</span>
+          </div>
+          <div class="paytable-mults">
+            <span><b>×${s.payout}</b></span>
+            <span><b>×${s.pair_payout}</b></span>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  async function initSlotsView() {
+    slotsErrorEl.textContent = '';
+    slotsResultEl.textContent = 'подключение к серверу…';
+    slotsPanelEl.innerHTML = '';
+    try {
+      await loadSlotsConfig();
+      reelEls.forEach(el => primeReel(el, slotsCfg.symbols[0].icon));
+      renderSlotsPaytable();
+      renderSlotsBetPanel();
+    } catch (e) {
+      slotsResultEl.textContent = '';
+      slotsErrorEl.textContent = 'Не удалось загрузить Слоты — попробуй открыть раздел ещё раз.';
+    }
+  }
+
+  // ---------- Апгрейд ----------
+  // Логика (шанс, множитель, итог) считается на сервере (webserver.py:
+  // handle_upgrade_run) — та же формула, что и в боте (handlers/upgrade.py).
+  // Здесь только выбор предметов и анимация "рулетки": маркер едет по
+  // шкале успех/сгорит и останавливается в зоне, которую вернул сервер —
+  // сам исход уже решён на бэкенде до старта анимации.
+  const upgradeStageEl = document.getElementById('upgrade-stage');
+  const upgradeResultEl = document.getElementById('upgrade-result');
+  const upgradeErrorEl = document.getElementById('upgrade-error');
+  const upgradePanelEl = document.getElementById('upgrade-panel');
+  const upgradeChanceFillEl = document.getElementById('upgrade-chance-fill');
+  const upgradeChanceMarkerEl = document.getElementById('upgrade-chance-marker');
+  const upgradeChanceRollEl = document.getElementById('upgrade-chance-roll');
+
+  let upgradeCfg = null; // { max_items, multipliers: [{multiplier, chance}] }
+  let upgradeItems = []; // незащищённый инвентарь, свежий список
+  let upgradePicked = []; // id выбранных предметов, в порядке выбора
+  let upgradeSelectedMult = null; // выбранный, но ещё не запущенный процент
+  let upgradeRunning = false;
+  let upgradeTimeoutId = null;
+
+  function stopUpgradeAnimation() {
+    if (upgradeTimeoutId) clearTimeout(upgradeTimeoutId);
+    upgradeTimeoutId = null;
+  }
+
+  async function loadUpgradeConfig() {
+    if (upgradeCfg) return upgradeCfg;
+    upgradeCfg = await apiGet('/api/upgrade/config');
+    return upgradeCfg;
+  }
+
+  function upgradeSelectedItems() {
+    return upgradePicked.map(id => upgradeItems.find(i => i.id === id)).filter(Boolean);
+  }
+
+  function upgradeTotalPrice() {
+    return upgradeSelectedItems().reduce((sum, i) => sum + i.price, 0);
+  }
+
+  function renderUpgradeStageIdle() {
+    upgradeStageEl.classList.remove('state-win', 'state-lose');
+    upgradeChanceFillEl.style.width = '0%';
+    upgradeChanceMarkerEl.style.transition = 'none';
+    upgradeChanceMarkerEl.style.left = '0%';
+    upgradeChanceRollEl.classList.remove('show', 'win', 'lose');
+    upgradeChanceRollEl.style.transition = 'none';
+    upgradeChanceRollEl.style.left = '0%';
+    upgradeResultEl.className = 'upgrade-result';
+  }
+
+  function renderUpgradePickPanel() {
+    renderUpgradeStageIdle();
+    upgradeErrorEl.textContent = '';
+
+    if (upgradeItems.length === 0) {
+      upgradeResultEl.textContent = 'Инвентарь пуст — сначала открой кейс';
+      upgradePanelEl.innerHTML = `<div class="placeholder-panel"><span class="big">🛠</span>Апгрейдить пока нечего.</div>`;
+      return;
+    }
+    upgradeResultEl.textContent = `Выбери от 1 до ${upgradeCfg.max_items} предметов для объединения`;
+
+    const total = upgradeTotalPrice();
+    const listHtml = upgradeItems.map(i => {
+      const picked = upgradePicked.includes(i.id);
+      const disabled = !picked && upgradePicked.length >= upgradeCfg.max_items;
+      return `
+        <div class="upgrade-item-row ${rarityClass(i.rarity)} ${picked ? 'picked' : ''} ${disabled ? 'disabled' : ''}" data-id="${i.id}">
+          <div class="upgrade-item-check">${picked ? '✓' : ''}</div>
+          <div class="upgrade-item-info">
+            <div class="upgrade-item-name">${escapeHtml(i.name)}</div>
+            <div class="upgrade-item-rarity">${escapeHtml(i.rarity)}</div>
+          </div>
+          <div class="upgrade-item-price">${fmt(i.price)}</div>
+        </div>
+      `;
+    }).join('');
+
+    upgradePanelEl.innerHTML = `
+      <div class="upgrade-summary">
+        <span>Выбрано: <b>${upgradePicked.length}</b> / ${upgradeCfg.max_items}</span>
+        <span>Сумма: <b>${fmt(total)}</b></span>
+      </div>
+      <div class="upgrade-item-list">${listHtml}</div>
+      <button class="upgrade-go-btn" id="upgrade-continue-btn" ${upgradePicked.length ? '' : 'disabled'}>Продолжить →</button>
+    `;
+
+    upgradePanelEl.querySelectorAll('.upgrade-item-row').forEach(row => {
+      row.addEventListener('click', () => toggleUpgradeItem(Number(row.dataset.id)));
+    });
+    const continueBtn = document.getElementById('upgrade-continue-btn');
+    if (continueBtn) continueBtn.addEventListener('click', renderUpgradeConfirmPanel);
+  }
+
+  function toggleUpgradeItem(id) {
+    const idx = upgradePicked.indexOf(id);
+    if (idx >= 0) {
+      upgradePicked.splice(idx, 1);
+    } else {
+      if (upgradePicked.length >= upgradeCfg.max_items) {
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+        return;
+      }
+      upgradePicked.push(id);
+    }
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    renderUpgradePickPanel();
+  }
+
+  function renderUpgradeConfirmPanel() {
+    const items = upgradeSelectedItems();
+    if (items.length === 0) { renderUpgradePickPanel(); return; }
+    const total = upgradeTotalPrice();
+    upgradeSelectedMult = null;
+
+    renderUpgradeStageIdle();
+    upgradeErrorEl.textContent = '';
+    upgradeResultEl.innerHTML = `Выбери процент — суммарная цена <b>${fmt(total)}</b> монет`;
+
+    const names = items.map(i => escapeHtml(i.name)).join(', ');
+    renderUpgradeMultPanel(items, total, names);
+  }
+
+  // Шаг 1: выбор процента (шанса) — только помечает кнопку выбранной.
+  // Сам апгрейд НЕ запускается сразу, только по отдельной кнопке "Запустить".
+  function renderUpgradeMultPanel(items, total, names) {
+    const multButtons = upgradeCfg.multipliers.map(m => `
+      <button class="upgrade-mult-btn ${upgradeSelectedMult === m.multiplier ? 'selected' : ''}" data-mult="${m.multiplier}">
+        x${m.multiplier}
+        <span class="chance">шанс ${Math.round(m.chance * 100)}% · итог ${fmt(Math.floor(total * m.multiplier))}</span>
+      </button>
+    `).join('');
+
+    const canStart = upgradeSelectedMult !== null;
+    upgradePanelEl.innerHTML = `
+      <div class="upgrade-summary"><span>Предметы: <b>${names}</b></span></div>
+      <div class="upgrade-mult-grid">${multButtons}</div>
+      <button class="upgrade-go-btn" id="upgrade-start-btn" ${canStart ? '' : 'disabled'}>
+        ${canStart ? `🛠 Запустить апгрейд x${upgradeSelectedMult}` : 'Сначала выбери процент'}
+      </button>
+      <button class="upgrade-secondary-btn" id="upgrade-back-to-pick-btn">‹ Изменить выбор</button>
+    `;
+
+    upgradePanelEl.querySelectorAll('.upgrade-mult-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        upgradeSelectedMult = Number(btn.dataset.mult);
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        renderUpgradeMultPanel(items, total, names);
+      });
+    });
+    const startBtn = document.getElementById('upgrade-start-btn');
+    if (startBtn && canStart) {
+      startBtn.addEventListener('click', () => runUpgrade(upgradeSelectedMult));
+    }
+    document.getElementById('upgrade-back-to-pick-btn').addEventListener('click', renderUpgradePickPanel);
+  }
+
+  async function loadUpgradeInventory() {
+    const data = await apiGet('/api/inventory');
+    upgradeItems = data.items.filter(i => !i.protected);
+    upgradePicked = upgradePicked.filter(id => upgradeItems.some(i => i.id === id));
+  }
+
+  async function runUpgrade(multiplier) {
+    if (upgradeRunning) return;
+    const items = upgradeSelectedItems();
+    if (items.length === 0) return;
+
+    upgradeRunning = true;
+    upgradeErrorEl.textContent = '';
+    upgradeStageEl.classList.remove('state-win', 'state-lose');
+    upgradeResultEl.className = 'upgrade-result';
+    upgradeResultEl.textContent = 'Крутим…';
+    upgradePanelEl.innerHTML = `<button class="upgrade-go-btn" disabled>🛠 Апгрейдим…</button>`;
+
+    try {
+      const res = await fetch('/api/upgrade/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ item_ids: items.map(i => i.id), multiplier }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const messages = {
+          item_protected: 'Один из предметов защищён — сними защиту в Инвентаре.',
+          item_not_found: 'Выбранные предметы больше недоступны.',
+        };
+        upgradeErrorEl.textContent = messages[data.error] || 'Не удалось выполнить апгрейд, попробуй ещё раз.';
+        upgradePicked = [];
+        await loadUpgradeInventory();
+        renderUpgradePickPanel();
+        return;
+      }
+
+      // Честная "рулетка": исход уже решён на сервере (data.success), тут
+      // только выбираем случайную точку остановки маркера ВНУТРИ нужной
+      // зоны шкалы, чтобы анимация каждый раз выглядела по-новому.
+      const chancePct = data.chance * 100;
+      upgradeChanceFillEl.style.width = `${chancePct}%`;
+      upgradeChanceMarkerEl.style.transition = 'none';
+      upgradeChanceMarkerEl.style.left = '0%';
+      // eslint-disable-next-line no-unused-expressions
+      upgradeChanceMarkerEl.offsetHeight; // форсируем reflow перед стартом transition
+      const failZoneWidth = 100 - chancePct;
+      const targetPct = data.success
+        ? chancePct * 0.1 + Math.random() * chancePct * 0.8
+        : chancePct + failZoneWidth * 0.1 + Math.random() * failZoneWidth * 0.8;
+      const clampedPct = Math.max(1, Math.min(99, targetPct));
+      upgradeChanceMarkerEl.style.transition = 'left 1.15s cubic-bezier(.17,.67,.2,1.15)';
+      upgradeChanceMarkerEl.style.left = `${clampedPct}%`;
+
+      // Показываем на баре, какой именно процент "выпал" в этом раунде.
+      upgradeChanceRollEl.textContent = `${clampedPct.toFixed(1)}%`;
+      upgradeChanceRollEl.classList.remove('win', 'lose');
+      upgradeChanceRollEl.style.transition = 'left 1.15s cubic-bezier(.17,.67,.2,1.15), opacity .2s ease';
+      upgradeChanceRollEl.style.left = `${clampedPct}%`;
+      upgradeChanceRollEl.classList.add('show', data.success ? 'win' : 'lose');
+
+      await new Promise(resolve => { upgradeTimeoutId = setTimeout(resolve, 1200); });
+
+      loadProfile();
+      statsCache = null;
+      inventoryLoaded = false;
+
+      if (data.success) {
+        upgradeStageEl.classList.add('state-win');
+        upgradeResultEl.className = 'upgrade-result win';
+        upgradeResultEl.innerHTML = `🎉 Апгрейд удался! <b>${escapeHtml(data.new_item.name)}</b> теперь стоит <b>${fmt(data.new_item.price)}</b> монет (было ${fmt(data.total_price)}).`;
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        upgradeStageEl.classList.add('state-lose');
+        upgradeResultEl.className = 'upgrade-result lose';
+        upgradeResultEl.textContent = `🔥 Не повезло, всё сгорело. −${fmt(data.total_price)} монет в джекпот.`;
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+      }
+
+      upgradePicked = [];
+      await loadUpgradeInventory();
+      upgradePanelEl.innerHTML = `<button class="upgrade-go-btn" id="upgrade-again-btn">🛠 Апгрейдить ещё</button>`;
+      document.getElementById('upgrade-again-btn').addEventListener('click', renderUpgradePickPanel);
+    } catch (e) {
+      upgradeErrorEl.textContent = 'Нет связи с сервером.';
+      renderUpgradePickPanel();
+    } finally {
+      upgradeRunning = false;
+    }
+  }
+
+  async function initUpgradeView() {
+    stopUpgradeAnimation();
+    upgradeRunning = false;
+    upgradePicked = [];
+    upgradeSelectedMult = null;
+    upgradeErrorEl.textContent = '';
+    upgradeResultEl.textContent = 'подключение к серверу…';
+    upgradePanelEl.innerHTML = '';
+    renderUpgradeStageIdle();
+    try {
+      await loadUpgradeConfig();
+      await loadUpgradeInventory();
+      renderUpgradePickPanel();
+    } catch (e) {
+      upgradeResultEl.textContent = '';
+      upgradeErrorEl.textContent = 'Не удалось загрузить Апгрейд — попробуй открыть раздел ещё раз.';
+    }
+  }
+
+  // ---------- Кейсы ----------
+  let casesLoaded = false;
+  const casesPoolById = {}; // caseId -> список предметов кейса (без весов), для ленты прокрутки
+  const RARITY_EMOJI = {
+    'Милитари': '🔵', 'Запрещённое': '🟪', 'Засекреченное': '🌸',
+    'Тайное': '🔴', 'Редкий спецпредмет': '🟡',
+  };
+
+  // Прокрутка ленты предметов, как в CS2: собираем длинную полосу карточек
+  // (случайные предметы этого кейса + реальный выигрыш от сервера в конце),
+  // затем анимируем transform так, чтобы выигрышная карточка точно
+  // остановилась под указателем в центре окна. Исход уже решён на сервере
+  // (data.item пришёл из /api/cases/open) — тут только красивая визуализация.
+  const CASE_REEL_CARD_W = 84;
+  const CASE_REEL_GAP = 10;
+  const CASE_REEL_WIN_INDEX = 36;
+  const CASE_REEL_TAIL = 6;
+
+  function caseReelCardHtml(item) {
+    const emoji = RARITY_EMOJI[item.rarity] || '◽';
+    return `
+      <div class="case-reel-card ${rarityClass(item.rarity)}">
+        <div class="emoji">${emoji}</div>
+        <div class="name">${escapeHtml(item.name)}</div>
+        <div class="price">${fmt(item.price)}</div>
+      </div>
+    `;
+  }
+
+  // Строит ленту карточек (случайный филлер + выигрыш в позиции CASE_REEL_WIN_INDEX + хвост)
+  // и запускает transition на нужном track-элементе так, чтобы выигрышная карточка
+  // остановилась ровно под указателем (track уже стоит с left:50%).
+  function spinCaseReelTrack(trackEl, pool, wonItem, cardW, gap, duration) {
+    const items = [];
+    for (let i = 0; i < CASE_REEL_WIN_INDEX; i++) items.push(pool[Math.floor(Math.random() * pool.length)]);
+    items.push(wonItem);
+    for (let i = 0; i < CASE_REEL_TAIL; i++) items.push(pool[Math.floor(Math.random() * pool.length)]);
+
+    trackEl.innerHTML = items.map(caseReelCardHtml).join('');
+    trackEl.style.transition = 'none';
+    trackEl.style.transform = 'translateX(0px)';
+    // eslint-disable-next-line no-unused-expressions
+    trackEl.offsetHeight; // форсируем reflow перед стартом transition
+
+    const cardFull = cardW + gap;
+    const jitter = (Math.random() - 0.5) * (cardW * 0.6);
+    const targetX = -(CASE_REEL_WIN_INDEX * cardFull + cardW / 2) + jitter;
+
+    trackEl.style.transition = `transform ${duration}ms cubic-bezier(.09,.72,.14,1)`;
+    trackEl.style.transform = `translateX(${targetX}px)`;
+  }
+
+  function playCaseOpenReel(caseId, wonItem) {
+    return new Promise(resolve => {
+      const pool = (casesPoolById[caseId] && casesPoolById[caseId].length) ? casesPoolById[caseId] : [wonItem];
+
+      const overlay = document.createElement('div');
+      overlay.className = 'drop-overlay case-reel-overlay';
+      overlay.innerHTML = `
+        <div class="case-reel-wrap">
+          <div class="case-reel-title">Открываем кейс…</div>
+          <div class="case-reel-viewport">
+            <div class="case-reel-pointer"></div>
+            <div class="case-reel-track" id="case-reel-track"></div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const track = overlay.querySelector('#case-reel-track');
+      const duration = 4600;
+      spinCaseReelTrack(track, pool, wonItem, CASE_REEL_CARD_W, CASE_REEL_GAP, duration);
+
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      setTimeout(() => {
+        overlay.remove();
+        resolve();
+      }, duration + 100);
+    });
+  }
+
+  // Открытие пачкой: столько же лент, сколько кейсов открыто одновременно —
+  // каждая крутится и останавливается на своём предмете, все параллельно.
+  const CASE_REEL_MULTI_CARD_W = 60;
+  const CASE_REEL_MULTI_GAP = 7;
+
+  function playCaseOpenReelMulti(caseId, wonItems) {
+    return new Promise(resolve => {
+      const pool = (casesPoolById[caseId] && casesPoolById[caseId].length) ? casesPoolById[caseId] : wonItems;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'drop-overlay case-reel-overlay';
+      overlay.innerHTML = `
+        <div class="case-reel-wrap multi">
+          <div class="case-reel-title">Открываем ${wonItems.length} кейсов…</div>
+          <div class="case-reel-lanes" id="case-reel-lanes"></div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const lanesEl = overlay.querySelector('#case-reel-lanes');
+      lanesEl.innerHTML = wonItems.map((_, idx) => `
+        <div class="case-reel-lane" id="case-reel-lane-${idx}">
+          <div class="case-reel-viewport">
+            <div class="case-reel-pointer"></div>
+            <div class="case-reel-track" id="case-reel-track-${idx}"></div>
+          </div>
+        </div>
+      `).join('');
+
+      let maxDuration = 0;
+      wonItems.forEach((item, idx) => {
+        const laneEl = document.getElementById(`case-reel-lane-${idx}`);
+        const track = document.getElementById(`case-reel-track-${idx}`);
+        // Небольшой разброс длительности — ленты тормозят не строго синхронно,
+        // как будто крутятся независимо, но все укладываются в общий таймаут.
+        const duration = 3400 + idx * 260 + Math.floor(Math.random() * 300);
+        maxDuration = Math.max(maxDuration, duration);
+        spinCaseReelTrack(track, pool, item, CASE_REEL_MULTI_CARD_W, CASE_REEL_MULTI_GAP, duration);
+        setTimeout(() => laneEl.classList.add('done'), duration);
+      });
+
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      setTimeout(() => {
+        overlay.remove();
+        resolve();
+      }, maxDuration + 150);
+    });
+  }
+
+  function showDropOverlay(item, extraNote) {
+    const emoji = RARITY_EMOJI[item.rarity] || '◽';
+    const overlay = document.createElement('div');
+    overlay.className = 'drop-overlay';
+    overlay.innerHTML = `
+      <div class="drop-card">
+        <div class="drop-emoji">${emoji}</div>
+        <div class="drop-name">${escapeHtml(item.name)}</div>
+        <div class="drop-rarity">${escapeHtml(item.rarity)}</div>
+        <div class="drop-price">${fmt(item.price)} монет</div>
+        ${extraNote ? `<div class="shop-hint" style="margin-bottom:12px;">${extraNote}</div>` : ''}
+        <button class="drop-close-btn">Забрать</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.drop-close-btn').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  function showMultiDropOverlay(items, priceTotal, xpGained) {
+    const totalValue = items.reduce((sum, i) => sum + i.price, 0);
+    const overlay = document.createElement('div');
+    overlay.className = 'drop-overlay';
+    overlay.innerHTML = `
+      <div class="drop-card multi">
+        <div class="drop-name" style="margin-bottom:10px;">Открыто ${items.length} кейсов</div>
+        <div class="drop-multi-grid">
+          ${items.map(i => `
+            <div class="drop-multi-item ${rarityClass(i.rarity)}">
+              <div class="emoji">${RARITY_EMOJI[i.rarity] || '◽'}</div>
+              <div class="name">${escapeHtml(i.name)}</div>
+              <div class="price">${fmt(i.price)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="drop-multi-total">Итого предметов на <b>${fmt(totalValue)}</b> монет · +${fmt(xpGained)} XP · заплачено ${fmt(priceTotal)}</div>
+        <button class="drop-close-btn">Забрать</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.drop-close-btn').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  async function openCase(caseId, count, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/cases/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ case_id: caseId, count }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error === 'insufficient_balance' ? `Недостаточно монет (нужно ${fmt(data.price)}).`
+          : data.error === 'level_too_low' ? `Кейс откроется с ${data.min_level} уровня.`
+          : 'Не удалось открыть кейс, попробуй ещё раз.';
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+        alert(msg);
+        return;
+      }
+      if (count > 1) {
+        await playCaseOpenReelMulti(caseId, data.items);
+        showMultiDropOverlay(data.items, data.price_paid, data.xp_gained);
+      } else {
+        await playCaseOpenReel(caseId, data.item);
+        showDropOverlay(data.item, `+${data.xp_gained} XP · заплачено ${fmt(data.price_paid)} монет`);
+      }
+      loadProfile();
+      statsCache = null;
+      inventoryLoaded = false;
+    } catch (e) {
+      alert('Нет связи с сервером.');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function renderCases() {
+    const el = document.getElementById('cases-list');
+    el.innerHTML = `<div class="loading-line">загрузка кейсов…</div>`;
+    try {
+      const data = await apiGet('/api/shop/cases');
+      const bulkCount = data.bulk_open_count || 5;
+      const level = meData?.level ?? 1;
+      data.cases.forEach(c => { casesPoolById[c.id] = c.items || c.sample_items || []; });
+      const cardsHtml = data.cases.map(c => {
+        const locked = level < c.min_level;
+        return `
+        <div class="case-card">
+          <div class="case-head">
+            <div class="case-name">${escapeHtml(c.name)}</div>
+            <div class="case-price">${fmt(c.price)} монет</div>
+          </div>
+          <div class="case-meta">МИН. УРОВЕНЬ ${c.min_level}</div>
+          <div class="chip-row">
+            ${c.sample_items.map(i => `<span class="chip">${escapeHtml(i.name)} <b>${fmt(i.price)}</b></span>`).join('')}
+          </div>
+          ${locked
+            ? `<div class="case-locked-note">🔒 Открывается с ${c.min_level} уровня (у тебя ${level})</div>`
+            : `<div class="case-open-row">
+                <button class="case-open-btn" data-case="${c.id}" data-count="1">🔓 Открыть за ${fmt(c.price)}</button>
+                <button class="case-open-btn x5" data-case="${c.id}" data-count="${bulkCount}">×${bulkCount}</button>
+              </div>`}
+        </div>
+      `;
+      }).join('');
+      el.innerHTML = cardsHtml;
+      el.querySelectorAll('.case-open-btn').forEach(btn => {
+        btn.addEventListener('click', () => openCase(btn.dataset.case, Number(btn.dataset.count), btn));
+      });
+      casesLoaded = true;
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить кейсы</div>`;
+    }
+  }
+
+  // ---------- Магазин ----------
+  async function buyShopItem(itemId, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/shop/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ item_id: itemId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error === 'insufficient_balance' ? 'Недостаточно монет для этой покупки.'
+          : data.error === 'level_too_low' ? `Предмет откроется с ${data.min_level} уровня.`
+          : 'Не удалось купить, попробуй ещё раз.';
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+        alert(msg);
+        return;
+      }
+      showDropOverlay(data.item, 'Куплено в магазине');
+      loadProfile();
+      statsCache = null;
+      inventoryLoaded = false;
+    } catch (e) {
+      alert('Нет связи с сервером.');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function renderShop() {
+    const el = document.getElementById('shop-list');
+    el.innerHTML = `<div class="loading-line">загрузка магазина…</div>`;
+    try {
+      const data = await apiGet('/api/shop/items');
+      if (!data.items.length) {
+        el.innerHTML = `<div class="placeholder-panel"><span class="big">🛒</span>Ассортимент магазина пока пуст.</div>`;
+        return;
+      }
+      el.innerHTML = `<div class="shop-hint" style="margin-bottom:10px;">Эксклюзивные предметы — не выпадают из кейсов или выпадают крайне редко.</div>` +
+        data.items.map(i => `
+          <div class="shop-item-card ${i.unlocked ? '' : 'locked'}">
+            <div class="shop-item-name">${escapeHtml(i.name)}</div>
+            <div class="shop-item-rarity">${escapeHtml(i.rarity)}</div>
+            <div class="shop-item-row">
+              <div class="shop-item-price">${fmt(i.price)} монет</div>
+              ${i.unlocked
+                ? `<button class="shop-buy-btn" data-item="${i.id}">Купить</button>`
+                : `<div class="case-locked-note" style="margin:0;">🔒 с ${i.min_level} ур.</div>`}
+            </div>
+          </div>
+        `).join('');
+      el.querySelectorAll('.shop-buy-btn').forEach(btn => {
+        btn.addEventListener('click', () => buyShopItem(btn.dataset.item, btn));
+      });
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить магазин</div>`;
+    }
+  }
+  let inventoryLoaded = false;
+  async function toggleProtect(itemId, nextState, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/inventory/protect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ item_id: Number(itemId), protected: nextState }),
+      });
+      if (!res.ok) throw new Error('failed');
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      inventoryLoaded = false;
+      renderInventory();
+    } catch (e) {
+      alert('Не удалось изменить защиту предмета.');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function sellItem(itemId, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/inventory/sell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+        body: JSON.stringify({ item_id: Number(itemId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error === 'item_protected' ? 'Предмет защищён — сначала сними защиту.' : 'Не удалось продать предмет.');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      loadProfile();
+      statsCache = null;
+      inventoryLoaded = false;
+      renderInventory();
+    } catch (e) {
+      alert('Нет связи с сервером.');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function sellAllItems(btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/inventory/sell_all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error !== 'nothing_to_sell') alert('Не удалось продать инвентарь.');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      alert(`Продано ${data.sold_count} шт. на ${fmt(data.sold_for)} монет.`);
+      loadProfile();
+      statsCache = null;
+      inventoryLoaded = false;
+      renderInventory();
+    } catch (e) {
+      alert('Нет связи с сервером.');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function renderInventory() {
+    if (inventoryLoaded) return;
+    const el = document.getElementById('inventory-list');
+    try {
+      const data = await apiGet('/api/inventory');
+      if (data.items.length === 0) {
+        el.innerHTML = `<div class="placeholder-panel"><span class="big">🎒</span>Инвентарь пуст.<br>Открой кейс, чтобы получить первый предмет.</div>`;
+      } else {
+        const sellableCount = data.items.filter(i => !i.protected).length;
+        const summary = `<div class="inv-summary"><span>Предметов: <b>${data.count}</b></span><span>Стоимость: <b>${fmt(data.total_value)}</b></span></div>`;
+        const sellAllBtn = sellableCount > 0
+          ? `<button class="sell-all-btn" id="sell-all-btn">🗑 Продать всё (${sellableCount} шт., кроме защищённых)</button>`
+          : '';
+        const rows = data.items.map(i => `
+          <div class="item-row ${rarityClass(i.rarity)} ${i.protected ? 'protected' : ''}">
+            <div>
+              <div class="item-name">${escapeHtml(i.name)}</div>
+              <div class="item-rarity">${escapeHtml(i.rarity)}</div>
+            </div>
+            <div class="item-right">
+              <div class="item-price">${fmt(i.price)}</div>
+              <button class="lock-btn ${i.protected ? 'on' : ''}" data-action="protect" data-id="${i.id}" data-next="${i.protected ? '0' : '1'}" title="${i.protected ? 'Снять защиту' : 'Защитить предмет'}">${i.protected ? '🔒' : '🔓'}</button>
+              <button class="sell-btn" data-action="sell" data-id="${i.id}" ${i.protected ? 'disabled' : ''} title="Продать">💸</button>
+            </div>
+          </div>
+        `).join('');
+        el.innerHTML = summary + sellAllBtn + rows;
+        el.querySelectorAll('[data-action="protect"]').forEach(btn => {
+          btn.addEventListener('click', () => toggleProtect(btn.dataset.id, btn.dataset.next === '1', btn));
+        });
+        el.querySelectorAll('[data-action="sell"]').forEach(btn => {
+          btn.addEventListener('click', () => sellItem(btn.dataset.id, btn));
+        });
+        const sellAllBtnEl = document.getElementById('sell-all-btn');
+        if (sellAllBtnEl) sellAllBtnEl.addEventListener('click', () => sellAllItems(sellAllBtnEl));
+      }
+      inventoryLoaded = true;
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить инвентарь</div>`;
+    }
+  }
+
+  // ---------- Профиль ----------
+  async function renderProfileTab() {
+    const el = document.getElementById('profile-stats');
+    try {
+      const s = await getStats();
+      const rows = [
+        ['Уровень', s.level],
+        ['Опыт', `${fmt(s.xp)} / ${fmt(s.xp_needed)}`],
+        ['Баланс', fmt(s.balance)],
+        ['Заработано всего', fmt(s.total_earned)],
+        ['Потрачено всего', fmt(s.total_spent)],
+        ['Кейсов открыто', fmt(s.cases_opened)],
+        ['Дуэлей сыграно', fmt(s.duels_played)],
+        ['Дуэлей выиграно', fmt(s.duels_won)],
+        ['Апгрейдов успешно', fmt(s.upgrades_success)],
+        ['Апгрейдов неудачно', fmt(s.upgrades_failed)],
+        ['Побед в джекпоте', fmt(s.jackpot_wins)],
+        ['Предметов в инвентаре', fmt(s.items_count)],
+      ];
+      let html = `<div class="profile-stat-list">` +
+        rows.map(([k, v]) => `<div class="profile-stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') +
+        `</div>`;
+
+      if (s.best_item_name) {
+        html += `
+          <div class="best-item-panel">
+            <div class="lbl">Лучший предмет</div>
+            <div class="name">${escapeHtml(s.best_item_name)}</div>
+            <div class="price">${fmt(s.best_item_price)} монет</div>
+          </div>
+        `;
+      }
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить профиль</div>`;
+    }
+  }
+
+  // ---------- Топ ----------
+  async function renderTop(type) {
+    const el = document.getElementById('top-list');
+    el.innerHTML = `<div class="loading-line">загрузка рейтинга…</div>`;
+    try {
+      const data = await apiGet('/api/top?type=' + encodeURIComponent(type));
+      if (!data.entries.length) {
+        el.innerHTML = `<div class="placeholder-panel"><span class="big">🏆</span>Рейтинг пока пуст.</div>`;
+        return;
+      }
+      const valueSuffix = type === 'coins' ? ' монет' : type === 'level' ? ' ур.' : '';
+      el.innerHTML = data.entries.map((e, idx) => `
+        <div class="top-row">
+          <div class="top-rank">${idx + 1}</div>
+          <div class="top-name">${escapeHtml(e.name)}${e.sub ? ` <span style="color:var(--text-dim); font-weight:400;">· ${escapeHtml(e.sub)}</span>` : ''}</div>
+          <div class="top-val">${fmt(e.value)}${valueSuffix}</div>
+        </div>
+      `).join('');
+    } catch (e) {
+      el.innerHTML = `<div class="error-line">не удалось загрузить топ</div>`;
+    }
+  }
+
+  document.querySelectorAll('#top-switch button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#top-switch button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      renderTop(btn.dataset.top);
+    });
+  });
+
+  // ---------- Навигация по вкладкам ----------
+  const tabRenderers = {
+    home: renderHome,
+    games: resetGamesView,
+    cases: renderCases,
+    shop: renderShop,
+    inventory: renderInventory,
+    profile: renderProfileTab,
+    top: () => renderTop('coins'),
+  };
+
+  function goToTab(tabId) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + tabId).classList.add('active');
+    const renderer = tabRenderers[tabId];
+    if (renderer) renderer();
+  }
+
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      goToTab(btn.dataset.tab);
+    });
+  });
+
+  // Быстрые ссылки с Главной ведут на нужную вкладку низа экрана.
+  document.querySelectorAll('.quick-card').forEach(card => {
+    card.addEventListener('click', () => {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      goToTab(card.dataset.goto);
+    });
+  });
+
+  loadProfile();
+  renderHome();
+</script>
+
+</body>
+</html>
