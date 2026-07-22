@@ -91,25 +91,11 @@ async def jackpot_draw_task(bot: Bot):
                                 })
                             db.draw_jackpot_multi(winners, config.JACKPOT_WINNER_AMOUNT)
 
-                            names = []
-                            for winner_id in winners:
-                                user = db.get_or_create_user(winner_id, None)
-                                name = user["username"] if user["username"] else f"id{winner_id}"
-                                names.append(f"@{name}" if user["username"] else name)
-                            names_str = ", ".join(names)
-
-                            announcement = (
-                                f"🎰 <b>Джекпот разыгран!</b>\n\n"
-                                f"Победители: {names_str}\n"
-                                f"Каждый из них получил <b>{config.JACKPOT_WINNER_AMOUNT}</b> монет!\n\n"
-                                f"Удачи в следующий раз! 🍀"
-                            )
-                            for user_id in all_user_ids:
-                                try:
-                                    await bot.send_message(user_id, announcement)
-                                except Exception:
-                                    pass
-                                await asyncio.sleep(0.05)
+                            # Оповещение о розыгрыше в чат временно убрано —
+                            # решение о том, куда его вывести вместо этого,
+                            # будет принято позже. Сам розыгрыш (начисление
+                            # монет победителям, статистика, журнал событий)
+                            # по-прежнему работает как раньше.
                     # Если монет не хватило — молча пропускаем розыгрыш,
                     # без уведомлений, как и требовалось.
         except Exception:
